@@ -89,7 +89,6 @@ def main():
     icon64 = os.path.join(dist, 'icon.png')
     make_icon.draw(64, icon64)
     files = plugin_tree() + [('resources/icon.png', icon64)]
-    inst_size = sum(os.path.getsize(f) for _, f in files)
     # metadata inside the zip carries no download fields
     meta_in = metadata('', '', 0, 0)
     for k in ('download_url', 'download_sha256', 'download_size', 'install_size'):
@@ -100,6 +99,8 @@ def main():
             z.write(f, arc)
         z.writestr('metadata.json', json.dumps(meta_in, indent=2))
     data = buf.getvalue()
+    # KiCad counts every entry of the archive, metadata.json included
+    inst_size = sum(i.file_size for i in zipfile.ZipFile(io.BytesIO(data)).infolist())
     zip_path = os.path.join(dist, f'tracklayer-pcm-{__version__}.zip')
     open(zip_path, 'wb').write(data)
     sha = hashlib.sha256(data).hexdigest()

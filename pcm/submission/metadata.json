@@ -39,9 +39,9 @@
         "linux"
       ],
       "download_url": "https://github.com/MichaelGaylor/Tracklayer/releases/download/v0.1.0/tracklayer-pcm-0.1.0.zip",
-      "download_sha256": "b659e335c664af4cf9656a477db52a6dee801b346cb7b72d4b44498485f95582",
-      "download_size": 42661,
-      "install_size": 129019
+      "download_sha256": "088934e73c9260ebca0692ee63246ed9e73951714a491864601432536f8da970",
+      "download_size": 43582,
+      "install_size": 134406
     }
   ]
 }
