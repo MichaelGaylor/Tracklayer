@@ -707,8 +707,11 @@ class Router:
             prev_failed = set(failed)
             to_route = self._order(nxt)
             if p == self.o.passes and conflicted:
-                # out of passes: drop colliding nets, last laid first, until nothing collides ...
-                for n in reversed(to_route):
+                # out of passes: drop colliding nets, smallest first, until nothing collides ...
+                pads = {}
+                for pd in self.b.pads:
+                    pads[pd.net] = pads.get(pd.net, 0) + 1
+                for n in sorted(to_route, key=lambda n: (pads.get(n, 0), self.routes[n].length if n in self.routes else 0)):
                     if n in conflicted and n in self.routes:
                         self.routes.pop(n)
                         self._rebuild_routed()
