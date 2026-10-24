@@ -129,24 +129,26 @@ class App:
         self.bend_cost = field(2, 1, 'Bend cost (mm)', '0.3')
         self.nets = field(3, 0, 'Only nets (patterns)', '')
         self.exclude = field(3, 1, 'Skip nets (patterns)', '')
+        self.layer_costs = field(4, 0, 'Layer costs', '')
+        ttk.Label(f, text='e.g. F.Cu=1.6: long runs avoid dear layers').grid(row=4, column=2, columnspan=2, sticky='w', padx=(12, 0))
         self.replace = tk.BooleanVar(value=False)
         self.refill = tk.BooleanVar(value=True)
         self.zone_nets = tk.BooleanVar(value=True)
-        ttk.Checkbutton(f, text='Remove existing unlocked tracks of the routed nets first', variable=self.replace).grid(row=4, column=0, columnspan=4, sticky='w')
-        ttk.Checkbutton(f, text='Refill zones afterwards', variable=self.refill).grid(row=5, column=0, columnspan=4, sticky='w')
-        ttk.Checkbutton(f, text='Route pads of pour nets that lie outside their pour', variable=self.zone_nets).grid(row=6, column=0, columnspan=4, sticky='w')
+        ttk.Checkbutton(f, text='Remove existing unlocked tracks of the routed nets first', variable=self.replace).grid(row=5, column=0, columnspan=4, sticky='w')
+        ttk.Checkbutton(f, text='Refill zones afterwards', variable=self.refill).grid(row=6, column=0, columnspan=4, sticky='w')
+        ttk.Checkbutton(f, text='Route pads of pour nets that lie outside their pour', variable=self.zone_nets).grid(row=7, column=0, columnspan=4, sticky='w')
         self.log = tk.Text(f, height=16, width=80, state='disabled', font=('Consolas', 9))
-        self.log.grid(row=7, column=0, columnspan=4, sticky='nsew', pady=(8, 8))
+        self.log.grid(row=8, column=0, columnspan=4, sticky='nsew', pady=(8, 8))
         sb = ttk.Scrollbar(f, command=self.log.yview)
-        sb.grid(row=7, column=4, sticky='ns')
+        sb.grid(row=8, column=4, sticky='ns')
         self.log['yscrollcommand'] = sb.set
         bar = ttk.Frame(f)
-        bar.grid(row=8, column=0, columnspan=4, sticky='e')
+        bar.grid(row=9, column=0, columnspan=4, sticky='e')
         self.run_btn = ttk.Button(bar, text='Route', command=self.on_run)
         self.run_btn.pack(side='left', padx=(0, 8))
         self.close_btn = ttk.Button(bar, text='Close', command=root.destroy)
         self.close_btn.pack(side='left')
-        f.columnconfigure(1, weight=1); f.columnconfigure(3, weight=1); f.rowconfigure(7, weight=1)
+        f.columnconfigure(1, weight=1); f.columnconfigure(3, weight=1); f.rowconfigure(8, weight=1)
         self.say(f'Tracklayer {__version__} by Tiggy Engineering  -  {SITE}')
         try:
             self.kicad = KiCad()
@@ -167,7 +169,11 @@ class App:
 
     def on_run(self):
         try:
-            opts = Options(engine=self.engine.get(), pitch=float(self.pitch.get()), via_pitch=float(self.pitch.get()),
+            lcs = {}
+            for item in self.layer_costs.get().split():
+                name, _, val = item.partition('=')
+                lcs[name.strip()] = float(val or 1.0)
+            opts = Options(engine=self.engine.get(), pitch=float(self.pitch.get()), via_pitch=float(self.pitch.get()), layer_costs=lcs,
                            passes=int(self.passes.get()), via_cost=float(self.via_cost.get()),
                            bend_cost=float(self.bend_cost.get()), angles=self.angles.get(),
                            route_zone_nets=self.zone_nets.get(), verbose=False)

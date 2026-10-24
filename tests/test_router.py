@@ -222,3 +222,21 @@ def test_six_layers_both_engines():
     write_board(b, r.routes, None, out)
     b2 = load(out)
     assert len(b2.copper_layers) == 6 and len(b2.tracks) > 0
+
+
+def test_layer_cost_moves_runs_inside():
+    b = _load(header_and_chip(layers=4))
+    nets = _nets(b)
+
+    def top_share(opts):
+        r = ShapeRouter(b, nets, opts)
+        r.run()
+        assert not r.unrouted
+        _clearance_ok(b, r.routes)
+        total = sum(rt.length for rt in r.routes.values())
+        top = sum(math.hypot(x2 - x1, y2 - y1) for rt in r.routes.values() for layer, x1, y1, x2, y2, w in rt.segments if layer == 'F.Cu')
+        return top / total
+
+    plain = top_share(Options(verbose=False))
+    dear = top_share(Options(verbose=False, layer_costs={'F.Cu': 3.0}))
+    assert dear < plain

@@ -245,6 +245,7 @@ class ShapeRouter:
         L = self.L
         K_V, K_VIA, K_T = self.o.shape_corners, self.o.shape_vias, 24
         W = self.o.shape_weight
+        lc = self.gr.layer_cost
         tx = np.array([p[1] for p in targets]); ty = np.array([p[2] for p in targets]); tl = np.array([p[0] for p in targets])
         tset = set(targets)
         via_cost = self.o.via_cost
@@ -347,7 +348,7 @@ class ShapeRouter:
                     nk = key(l, qx, qy)
                     if nk in closed:
                         continue
-                    ng = gc + float(dist[q])
+                    ng = gc + float(dist[q]) * lc[l]
                     if ng < gscore.get(nk, INF):
                         gscore[nk] = ng; parent[nk] = k
                         heapq.heappush(heap, (ng + W * float(np.hypot(tx - qx, ty - qy).min()), l, qx, qy))
@@ -355,7 +356,7 @@ class ShapeRouter:
                     # a via spot: first the track to it on this layer, then the layer change
                     hq = W * float(np.hypot(tx - qx, ty - qy).min())
                     here = key(l, qx, qy)
-                    ng = gc + float(dist[q])
+                    ng = gc + float(dist[q]) * lc[l]
                     if ng < gscore.get(here, INF):
                         gscore[here] = ng; parent[here] = k     # a waypoint for the path, not a state to expand
                     base = ng + via_cost

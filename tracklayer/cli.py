@@ -24,6 +24,8 @@ def main(argv=None) -> int:
     ap.add_argument('--pitch', type=float, default=0.2, help='grid engine: grid pitch in mm (default 0.2)')
     ap.add_argument('--via-pitch', type=float, default=0.25, help='shape engine: lattice of via positions (default 0.25)')
     ap.add_argument('--layers', help='copper layers to use, comma separated (default: all)')
+    ap.add_argument('--layer-cost', action='append', default=[], metavar='LAYER=FACTOR',
+                    help='make a layer dearer, e.g. --layer-cost F.Cu=1.6 keeps long runs off the top (repeatable)')
     ap.add_argument('--nets', nargs='*', default=None, help='only route nets matching these patterns (fnmatch)')
     ap.add_argument('--exclude', nargs='*', default=[], help='never route nets matching these patterns')
     ap.add_argument('--passes', type=int, default=8, help='rip-up and reroute passes (default 8)')
@@ -65,7 +67,11 @@ def main(argv=None) -> int:
         doomed = [t for t in b.tracks if t.net in nets and not t.locked] + [v for v in b.vias if v.net in nets and not v.locked]
         b.tracks = [t for t in b.tracks if not (t.net in nets and not t.locked)]
         b.vias = [v for v in b.vias if not (v.net in nets and not v.locked)]
-    opts = Options(engine=a.engine, via_pitch=a.via_pitch, pitch=a.pitch, layers=a.layers.split(',') if a.layers else None, passes=a.passes,
+    layer_costs = {}
+    for item in a.layer_cost:
+        name, _, val = item.partition('=')
+        layer_costs[name.strip()] = float(val or 1.0)
+    opts = Options(engine=a.engine, via_pitch=a.via_pitch, pitch=a.pitch, layer_costs=layer_costs, layers=a.layers.split(',') if a.layers else None, passes=a.passes,
                    via_cost=a.via_cost, bend_cost=a.bend_cost, zone_cost=a.zone_cost, zone_cost_local=a.zone_cost_local, angles=a.angles,
                    route_zone_nets=not a.no_zone_nets, via_in_pad=a.via_in_pad, margin=a.margin,
                    pour_obstacle_frac=a.pour_obstacle, pour_depth=a.pour_depth,

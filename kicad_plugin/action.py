@@ -92,6 +92,7 @@ class TracklayerDialog(wx.Dialog):
         self.bend_cost = field('Bend cost (mm)', '0.3')
         self.nets = field('Only nets (patterns)', '', 'Space separated, e.g. D* CLK; empty routes everything unrouted')
         self.exclude = field('Skip nets (patterns)', '')
+        self.layer_costs = field('Layer costs', '', 'e.g. F.Cu=1.6 B.Cu=1.2: long runs avoid dear layers; space separated')
         grid.Add(wx.StaticText(p, label='Engine'), 0, wx.ALIGN_CENTER_VERTICAL)
         self.engine = wx.Choice(p, choices=['shape (exact geometry, any angle)', 'grid (45 degree tracks)'])
         self.engine.SetSelection(0)
@@ -143,7 +144,12 @@ class TracklayerDialog(wx.Dialog):
         angles = ['45', 'any', '90'][self.angles.GetSelection()]
         layers = [l.strip() for l in self.layers.GetValue().split(',') if l.strip()]
         engine = ['shape', 'grid'][self.engine.GetSelection()]
+        lcs = {}
+        for item in self.layer_costs.GetValue().split():
+            name, _, val = item.partition('=')
+            lcs[name.strip()] = float(val or 1.0)
         return Options(engine=engine, via_pitch=float(self.pitch.GetValue()), pitch=float(self.pitch.GetValue()), passes=int(self.passes.GetValue()),
+                       layer_costs=lcs,
                        via_cost=float(self.via_cost.GetValue()), bend_cost=float(self.bend_cost.GetValue()),
                        angles=angles, layers=layers or None, route_zone_nets=self.zone_nets.GetValue(), verbose=False)
 

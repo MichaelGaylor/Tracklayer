@@ -41,6 +41,7 @@ SQ2 = math.sqrt(2.0)
 class Options:
     pitch: float = 0.2            # grid pitch, mm
     layers: list[str] | None = None
+    layer_costs: dict | None = None   # {'F.Cu': 1.6}: a track on that layer counts 1.6 times its length
     passes: int = 8
     via_cost: float = 4.0         # mm of track a via is worth
     bend_cost: float = 0.3        # mm per direction change
@@ -108,6 +109,7 @@ class Router:
         self.L = len(self.layers)
         self.lidx = {l: k for k, l in enumerate(self.layers)}
         self.margin = opts.margin if opts.margin is not None else 0.71 * opts.pitch
+        self.layer_cost = [max(1.0, float((opts.layer_costs or {}).get(l, 1.0))) for l in self.layers]
         x0, y0, x1, y1 = board.bbox()
         m = 3 * opts.pitch
         self.g = Grid(x0 - m, y0 - m, x1 + m, y1 + m, opts.pitch)
@@ -482,6 +484,7 @@ class Router:
             offs = tuple(o for o in offs if o[1] == 1.0)
         # per-layer extra factor for vertical (axis 1) / horizontal (axis 2) moves
         pref = []
+        lc = self.layer_cost
         for l in range(L):
             horiz = (l % 2 == 0)
             pref.append((0.0, dp if horiz else 0.0, 0.0 if horiz else dp))
@@ -537,7 +540,7 @@ class Router:
                 nb = cur + doff
                 if hard[nb] or closed[nb]:
                     continue
-                ng = gc + pitch * ln * (1.0 + cost[nb] + pl[axis]) + (bend if (pd != k and pd != 255) else 0.0)
+                ng = gc + pitch * ln * lc[l] * (1.0 + cost[nb] + pl[axis]) + (bend if (pd != k and pd != 255) else 0.0)
                 if ng < g[nb]:
                     g[nb] = ng
                     parent[nb] = cur

@@ -88,6 +88,7 @@ anything critical first; the plugin keeps existing tracks and routes the rest.
 | `--bend-cost` | 0.3 mm | Price of a direction change. |
 | `--zone-cost` | 0.3 | Extra cost factor for crossing a plane-sized pour of another net. |
 | `--zone-cost-local` | 2.5 | The same for a small pour. |
+| `--layer-cost F.Cu=1.6` | 1 | Make a layer dearer: long runs move to the other layers, short pad escapes stay. Repeatable. |
 | `--nets A B*` | all | Route only nets matching the patterns. `--exclude` does the opposite. |
 | `--no-zone-nets` | | Do not route nets that have pours at all. |
 | `--pour-obstacle FRAC` | off | Pours covering less than FRAC of the board are hard obstacles for other nets. |
