@@ -25,8 +25,7 @@ def _clearance_ok(board, routes, clearance=0.2):
     """Every new segment keeps `clearance` from every pad of another net and from other nets' segments."""
     segs = []
     for r in routes.values():
-        w = r.params[0]
-        for layer, x1, y1, x2, y2 in r.segments:
+        for layer, x1, y1, x2, y2, w in r.segments:
             segs.append((r.net, layer, x1, y1, x2, y2, w / 2))
     for net, layer, x1, y1, x2, y2, hw in segs:
         for p in board.pads:

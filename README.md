@@ -36,6 +36,8 @@ including CI. It reads KiCad 7, 8, 9 and 10 board files, and the net classes fro
   written out wrong.
 * **Clean geometry.** Routes are smoothed into 45-degree segments (`--angles any` for
   free-angle, `--angles 90` for orthogonal). Track ends land on pad centres.
+* **Neck-down.** When a wide net cannot leave a small pad at its full width without breaking
+  clearance, that connection is laid at the Default class width instead (`--neck` to choose).
 * **Any number of copper layers** with through vias. Multilayer boards are routed on every
   copper layer in the stack, or on the ones you name with `--layers F.Cu,B.Cu`.
 
@@ -67,7 +69,15 @@ routes are smoothed, checked again against the same rasters, and painted back in
 Because the check is done at cell centres, every clearance carries a small safety margin of
 0.71 times the grid pitch (0.14 mm at the default pitch). That makes the result conservative:
 KiCad's DRC should never complain, but a gap only just wide enough for a track will be refused
-at the default pitch. Use `--pitch 0.1` for tight boards, or `--margin` to set it directly.
+at the default pitch. Use `--pitch 0.1` for boards with SOIC or finer pitch parts, or when a
+net class asks for a clearance much larger than the gaps between the pads it has to reach; it
+takes about four times longer. `--margin` sets the margin directly if you know what you are doing.
+
+A note on net classes: KiCad applies the larger of the two nets' clearances between any two
+items. A class with a 0.4 mm clearance can therefore never be routed into a 2.54 mm header pin
+whose neighbours are 0.84 mm away, by this router or by hand, because the track would sit
+closer than 0.4 mm to the next pin. Tracklayer reports such nets by pad name instead of
+guessing.
 
 ## Limits, honestly
 

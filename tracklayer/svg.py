@@ -44,8 +44,7 @@ def write_svg(board: Board, routes, path: str, unrouted: list[int] | None = None
         if p.through and p.drill > 0:
             out.append(f'<circle cx="{fmt(p.x)}" cy="{fmt(p.y)}" r="{fmt(p.drill / 2)}" fill="#1d1f24"/>')
     for r in routes.values():
-        w = r.params[0]
-        for layer, ax, ay, bx, by in r.segments:
+        for layer, ax, ay, bx, by, w in r.segments:
             out.append(f'<line x1="{fmt(ax)}" y1="{fmt(ay)}" x2="{fmt(bx)}" y2="{fmt(by)}" stroke="{_colour(layer)}" stroke-width="{fmt(w)}" stroke-linecap="round"/>')
         for x, y in r.vias:
             out.append(f'<circle cx="{fmt(x)}" cy="{fmt(y)}" r="{fmt(r.params[2] / 2)}" fill="#e0e0e0"/>'

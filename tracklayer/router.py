@@ -19,6 +19,7 @@ Overview
 """
 from __future__ import annotations
 
+import copy
 import heapq
 import math
 import time
@@ -56,6 +57,7 @@ class Options:
     pour_depth: float = 1.0           # how far inside a pour a track of its own net must end, mm
     via_in_pad: bool = False
     margin: float | None = None   # grid quantisation margin added to every clearance; default 0.71 * pitch
+    neck_width: float | None = None   # width used to escape tight pads; default: the Default class width
     width: float | None = None    # overrides for every routed net
     clearance: float | None = None
     via_diameter: float | None = None
@@ -82,7 +84,7 @@ class RouteClass:
 @dataclass
 class NetRoute:
     net: int
-    segments: list[tuple[str, float, float, float, float]] = field(default_factory=list)  # layer, x1, y1, x2, y2
+    segments: list[tuple[str, float, float, float, float, float]] = field(default_factory=list)  # layer, x1, y1, x2, y2, width
     vias: list[tuple[float, float]] = field(default_factory=list)
     cells: list[tuple[int, int, int]] = field(default_factory=list)      # (layer index, j, i) of the centrelines
     complete: bool = True
@@ -171,12 +173,22 @@ class Router:
         # route classes
         self.classes: dict[tuple, RouteClass] = {}
         self.class_of: dict[int, RouteClass] = {}
+        self.neck_of: dict[int, RouteClass | None] = {}
+        neck_w = self.o.neck_width or b.netclasses['Default'].track_width
         for n in self.nets:
             w, cl, vd, vdr = self.net_params(n)
             key = (round(w, 4), round(cl, 4), round(vd, 4))
             if key not in self.classes:
                 self.classes[key] = RouteClass(w, cl, vd, vdr)
             self.class_of[n] = self.classes[key]
+            # a narrower class to escape pads that the full width cannot leave cleanly
+            if neck_w < w - 1e-6:
+                nkey = (round(neck_w, 4), round(cl, 4), round(vd, 4))
+                if nkey not in self.classes:
+                    self.classes[nkey] = RouteClass(neck_w, cl, vd, vdr)
+                self.neck_of[n] = self.classes[nkey]
+            else:
+                self.neck_of[n] = None
         for c in self.classes.values():
             self._build_class(c)
         self.say(f'grid {self.NX}x{self.NY} cells x {L} layers at {self.o.pitch} mm, '
@@ -303,11 +315,11 @@ class Router:
         wn, cln, vdn, _ = self.net_params(r.net)
         for c in self.classes.values():
             R = max(c.clearance, cln) + self.margin
-            for layer, x1, y1, x2, y2 in r.segments:
+            for layer, x1, y1, x2, y2, ws in r.segments:
                 li = self.lidx[layer]
-                j0, i0, m = capsule_mask(self.g, x1, y1, x2, y2, c.width / 2 + R + wn / 2)
+                j0, i0, m = capsule_mask(self.g, x1, y1, x2, y2, c.width / 2 + R + ws / 2)
                 paint_owner(c.tr[li], j0, i0, m, r.net, ALL)
-                j0, i0, m = capsule_mask(self.g, x1, y1, x2, y2, c.via_d / 2 + R + wn / 2)
+                j0, i0, m = capsule_mask(self.g, x1, y1, x2, y2, c.via_d / 2 + R + ws / 2)
                 paint_owner(c.vr[li], j0, i0, m, r.net, ALL)
             for x, y in r.vias:
                 for li in range(self.L):
@@ -328,8 +340,11 @@ class Router:
         new track may end on, plus the pad-centre lookup for tidy track ends."""
         g, b = self.g, self.b
         w = self.net_params(net)[0]
+        neck = self.neck_of.get(net)
+        w_src = neck.width if neck else w
         items: list[list[tuple[int, int, int]]] = []
         centres: dict[tuple[int, int, int], tuple[float, float]] = {}
+        self._labels: dict[tuple[int, int, int], str] = {}
         for p in b.pads:
             if p.net != net:
                 continue
@@ -339,13 +354,14 @@ class Router:
                 if l not in self.lidx:
                     continue
                 li = self.lidx[l]
-                j0, i0, m = rrect_mask(g, p.x, p.y, p.w, p.h, p.rot, p.corner_radius(), -w / 2)
+                j0, i0, m = rrect_mask(g, p.x, p.y, p.w, p.h, p.rot, p.corner_radius(), -w_src / 2)
                 cs = cells_of(j0, i0, m)
                 if 0 <= cj < self.NY and 0 <= ci < self.NX:
                     cs.append((cj, ci))
                 for j, i in set(cs):
                     cells.append((li, j, i))
                     centres[(li, j, i)] = (p.x, p.y)
+                    self._labels[(li, j, i)] = f'{p.ref}.{p.number}'
             if cells:
                 items.append(cells)
         for t in b.tracks:
@@ -420,8 +436,8 @@ class Router:
         return list(comps.values())
 
     # ------------------------------------------------------------------ per-net search data
-    def _prepare(self, net: int, soft: bool, pen: float):
-        c = self.class_of[net]
+    def _prepare(self, net: int, soft: bool, pen: float, c: RouteClass | None = None):
+        c = c or self.class_of[net]
         hard = (c.tl != FREE) & (c.tl != net)
         hard |= c.edge_t[None, :, :]
         cost = c.prox.copy()
@@ -557,12 +573,16 @@ class Router:
         r.via_layers = (self.layers[0], self.layers[-1])
         if len(comps) < 2:
             return r
-        hard, cost, via_ok, via_pen, strict = self._prepare(net, soft, pen)
+        full = self._prepare(net, soft, pen)
+        neck_cls = self.neck_of.get(net)
+        neck = None
         comps.sort(key=len, reverse=True)
         tree = set(comps[0])
         others = comps[1:]
         name = self.b.nets.get(net, str(net))
         while others:
+            hard, cost, via_ok, via_pen, strict = full
+            width = w
             target = bytearray(self.N)
             boxes = []
             where: dict[int, int] = {}
@@ -575,14 +595,24 @@ class Router:
                     where[idx] = k
             sources = [l * self.LN + j * self.NX + i for (l, j, i) in tree]
             path, nexp = self._astar(sources, target, hard, cost, via_ok, via_pen, boxes)
+            if path is None and neck_cls is not None:
+                # the full width cannot leave or reach a pad cleanly: try the narrower escape width
+                if neck is None:
+                    neck = self._prepare(net, soft, pen, neck_cls)
+                hard, cost, via_ok, via_pen, strict = neck
+                width = neck_cls.width
+                path, nexp2 = self._astar(sources, target, hard, cost, via_ok, via_pen, boxes)
+                nexp += nexp2
             if path is None:
-                self.say(f'  {name}: no path for {len(others)} remaining connection(s) after {nexp} expansions')
+                what = sorted({self._labels.get(c, '') for comp in others for c in comp} - {''})[:6]
+                self.say(f'  {name}: no path for {len(others)} remaining connection(s) '
+                         f'({", ".join(what) or "pour"}) after {nexp} expansions')
                 r.complete = False
                 break
             k = where[path[-1]]
             reached = others.pop(k)
             cells = [(idx // self.LN, (idx % self.LN) // self.NX, idx % self.NX) for idx in path]
-            new_cells = self._emit(r, cells, centres, strict, w)
+            new_cells = self._emit(r, cells, centres, strict, width)
             tree |= reached
             tree |= new_cells
             # the new copper is an obstacle for this net's own later branches only via clearance;
@@ -625,13 +655,14 @@ class Router:
             for (x1, y1), (x2, y2) in zip(pts, pts[1:]):
                 if abs(x1 - x2) < 1e-6 and abs(y1 - y2) < 1e-6:
                     continue
-                r.segments.append((layer, x1, y1, x2, y2))
+                r.segments.append((layer, x1, y1, x2, y2, w))
                 r.length += math.hypot(x2 - x1, y2 - y1)
                 j0, i0, m = capsule_mask(g, x1, y1, x2, y2, max(w / 2 * 0.9, 0.01))
                 for j, i in cells_of(j0, i0, m):
                     new_cells.add((li, j, i))
+            # only cells the finished copper really covers may be targets for later branches;
+            # smoothing moves the track off some of the raw path cells
             for (_, j, i) in run:
-                new_cells.add((li, j, i))
                 r.cells.append((li, j, i))
             if k < len(runs) - 1:
                 _, j, i = run[-1]
@@ -647,9 +678,10 @@ class Router:
         order = self._order(self.nets)
         to_route = list(order)
         prev_failed: set[int] | None = None
+        best: tuple[int, dict] | None = None    # (incomplete count, routes) of the best collision-free state
         for p in range(1, self.o.passes + 1):
             soft = p > 1
-            pen = self.o.conflict_cost * p
+            pen = self.o.conflict_cost * (2 ** (p - 1))   # negotiated congestion: the price doubles every pass
             if soft:
                 for n in to_route:
                     self.routes.pop(n, None)
@@ -662,8 +694,10 @@ class Router:
                     self.routes[n] = r
                     self._paint_route(r)
             conflicted = self._conflicts()
-            failed = [n for n in to_route if n not in self.routes or not self.routes[n].complete]
+            failed = [n for n in self.nets if n not in self.routes or not self.routes[n].complete]
             self.say(f'  pass {p} done in {time.time() - tp:.1f} s: {len(failed)} incomplete, {len(conflicted)} in conflict')
+            if not conflicted and (best is None or len(failed) < best[0]):
+                best = (len(failed), copy.deepcopy(self.routes))
             nxt = sorted(set(failed) | set(conflicted))
             if not nxt:
                 break
@@ -673,7 +707,7 @@ class Router:
             prev_failed = set(failed)
             to_route = self._order(nxt)
             if p == self.o.passes and conflicted:
-                # out of passes: drop colliding nets, last laid first, until nothing collides
+                # out of passes: drop colliding nets, last laid first, until nothing collides ...
                 for n in reversed(to_route):
                     if n in conflicted and n in self.routes:
                         self.routes.pop(n)
@@ -681,6 +715,12 @@ class Router:
                         conflicted = self._conflicts()
                         if not conflicted:
                             break
+                # ... unless an earlier collision-free pass left fewer nets unrouted
+                now = sum(1 for n in self.nets if n not in self.routes or not self.routes[n].complete)
+                if best is not None and best[0] < now:
+                    self.say(f'  keeping the result of the best earlier pass ({best[0]} incomplete instead of {now})')
+                    self.routes = best[1]
+                    self._rebuild_routed()
         self.unrouted = [n for n in self.nets if n not in self.routes or not self.routes[n].complete]
         self.say(f'finished in {time.time() - t0:.1f} s: {len(self.nets) - len(self.unrouted)}/{len(self.nets)} nets routed, '
                  f'{sum(len(r.vias) for r in self.routes.values())} vias, '
@@ -696,8 +736,8 @@ class Router:
         buckets: dict[tuple[int, int], list[int]] = {}
         for n, r in self.routes.items():
             w, cl, vd, _ = r.params
-            for layer, x1, y1, x2, y2 in r.segments:
-                items.append((n, x1, y1, x2, y2, w / 2, self.lidx[layer]))
+            for layer, x1, y1, x2, y2, ws in r.segments:
+                items.append((n, x1, y1, x2, y2, ws / 2, self.lidx[layer]))
             for x, y in r.vias:
                 for li in range(self.L):
                     items.append((n, x, y, x, y, vd / 2, li))
@@ -718,7 +758,11 @@ class Router:
                         continue
                     seen.add((ka, kb))
                     need = ahw + bhw + max(self.net_params(na)[1], self.net_params(nb_)[1]) - 1e-4
-                    if _seg_dist(ax1, ay1, ax2, ay2, bx1, by1, bx2, by2) < need:
+                    dist = _seg_dist(ax1, ay1, ax2, ay2, bx1, by1, bx2, by2)
+                    if dist < need:
+                        if self.o.verbose and len(bad) < 6:
+                            self.say(f'  collision: {self.b.net_name(na)} / {self.b.net_name(nb_)} gap '
+                                     f'{dist - ahw - bhw:.3f} at ({ax1:.2f},{ay1:.2f})-({ax2:.2f},{ay2:.2f}) vs ({bx1:.2f},{by1:.2f})-({bx2:.2f},{by2:.2f}) {self.layers[li]}')
                         mx, my = (ax1 + ax2 + bx1 + bx2) / 4, (ay1 + ay2 + by1 + by2) / 4
                         j, i = self.g.to_cell(mx, my)
                         bad.setdefault(na, []).append((li, j, i))

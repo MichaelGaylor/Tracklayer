@@ -35,6 +35,7 @@ def main(argv=None) -> int:
     ap.add_argument('--pour-depth', type=float, default=1.0, help='how far inside its pour a track must end, mm')
     ap.add_argument('--via-in-pad', action='store_true', help='allow vias inside SMD pads of the same net')
     ap.add_argument('--replace', action='store_true', help='remove existing unlocked tracks of the routed nets first')
+    ap.add_argument('--neck', type=float, help='width used to escape tight pads (default: the Default class width)')
     ap.add_argument('--width', type=float, help='track width for every routed net (overrides net classes)')
     ap.add_argument('--clearance', type=float, help='clearance for every routed net')
     ap.add_argument('--via', type=float, help='via diameter for every routed net')
@@ -65,7 +66,7 @@ def main(argv=None) -> int:
                    via_cost=a.via_cost, bend_cost=a.bend_cost, zone_cost=a.zone_cost, zone_cost_local=a.zone_cost_local, angles=a.angles,
                    route_zone_nets=not a.no_zone_nets, via_in_pad=a.via_in_pad, margin=a.margin,
                    pour_obstacle_frac=a.pour_obstacle, pour_depth=a.pour_depth,
-                   width=a.width, clearance=a.clearance, via_diameter=a.via, via_drill=a.drill, verbose=not a.quiet)
+                   width=a.width, neck_width=a.neck, clearance=a.clearance, via_diameter=a.via, via_drill=a.drill, verbose=not a.quiet)
     if not nets:
         print('nothing to route', file=sys.stderr)
         return 1

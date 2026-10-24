@@ -31,9 +31,9 @@ def write_board(board: Board, routes, replace_nets: set[int] | None = None, out_
     for r in routes.values():
         w, _, vd, vdr = r.params
         net_s = f'(net "{board.net_name(r.net)}")' if board.nets_by_name else f'(net {r.net})'
-        for layer, x1, y1, x2, y2 in r.segments:
+        for layer, x1, y1, x2, y2, ws in r.segments:
             lines.append(f'\t(segment\n\t\t(start {fmt(x1)} {fmt(y1)})\n\t\t(end {fmt(x2)} {fmt(y2)})\n'
-                         f'\t\t(width {fmt(w)})\n\t\t(layer "{layer}")\n\t\t{net_s}\n\t\t(uuid "{uuid.uuid4()}")\n\t)')
+                         f'\t\t(width {fmt(ws)})\n\t\t(layer "{layer}")\n\t\t{net_s}\n\t\t(uuid "{uuid.uuid4()}")\n\t)')
         for x, y in r.vias:
             lays = ' '.join(f'"{l}"' for l in (r.via_layers or ('F.Cu', 'B.Cu')))
             lines.append(f'\t(via\n\t\t(at {fmt(x)} {fmt(y)})\n\t\t(size {fmt(vd)})\n\t\t(drill {fmt(vdr)})\n'
