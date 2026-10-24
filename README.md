@@ -66,7 +66,9 @@ python install_kicad_plugin.py
 ```
 
 which copies the plugin and the router into KiCad's user plugin folder for every KiCad version
-it finds under Documents/KiCad (pass `--dir` for another folder). Then in the PCB editor use
+it finds under Documents/KiCad (pass `--dir` for another folder). Or take the package zip from
+the [releases page](https://github.com/MichaelGaylor/Tracklayer/releases) and use
+Plugin and Content Manager > Install from File. (`pcm/SUBMIT.md` has the steps for the PCM listing.) Then in the PCB editor use
 Tools > External Plugins > Tracklayer autoroute, or the toolbar button. Hand-route and lock
 anything critical first; the plugin keeps existing tracks and routes the rest.
 
