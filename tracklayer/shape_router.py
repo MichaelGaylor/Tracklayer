@@ -298,7 +298,7 @@ class ShapeRouter:
             # obstacle corners on this layer: not our own net's, and only tangent ones (the line from
             # here must leave both neighbouring edges on the same side, else the corner is no use)
             vx, vy, vp, vi_, pvx, pvy, nvx, nvy = verts[l]
-            near = obs[l].vertices_near(x, y, 3 * K_V)
+            near = obs[l].vertices_near(x, y, 4 * K_V)
             if len(near):
                 vx_, vy_ = vx[near], vy[near]
                 dx, dy = vx_ - x, vy_ - y
@@ -315,13 +315,13 @@ class ShapeRouter:
             n_plain = sum(len(a) for a in cx)
             # via spots: the nearest legal lattice points, from a window that grows if it is empty
             if L > 1:
-                for Rw in (2.0, 5.0, 12.0):
+                for Rw in (3.0, 8.0, 20.0):
                     j0, i0 = g.to_cell(x - Rw, y - Rw); j1, i1 = g.to_cell(x + Rw, y + Rw)
                     j0, i0 = max(j0, 0), max(i0, 0); j1, i1 = min(j1 + 1, g.ny), min(i1 + 1, g.nx)
                     if j1 <= j0 or i1 <= i0:
                         continue
                     jj, ii = np.nonzero(via_ok[j0:j1, i0:i1])
-                    if len(jj) >= K_VIA or Rw >= 12.0:
+                    if len(jj) >= K_VIA or Rw >= 20.0:
                         break
                 if len(jj):
                     px = g.x0 + (ii + i0) * g.pitch; py = g.y0 + (jj + j0) * g.pitch

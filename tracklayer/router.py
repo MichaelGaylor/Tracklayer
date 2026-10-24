@@ -66,9 +66,9 @@ class Options:
     verbose: bool = True
     engine: str = 'shape'         # 'shape' (exact geometry) or 'grid'
     via_pitch: float = 0.25       # shape engine: lattice of candidate via positions, mm
-    shape_corners: int = 100      # shape engine: nearest obstacle corners tried from each point
+    shape_corners: int = 160      # shape engine: nearest obstacle corners tried from each point
     shape_vias: int = 40          # shape engine: nearest via spots tried from each point
-    shape_expansions: int = 6000  # shape engine: search budget per connection
+    shape_expansions: int = 10000 # shape engine: search budget per connection
     shape_weight: float = 1.25    # shape engine: heuristic weight (>1 trades a little length for speed)
 
 
