@@ -81,3 +81,40 @@ def smooth_polyline(pts: list[Pt], clear, mode: str, pitch: float) -> list[Pt]:
         out += best
         i = k
     return _merge(out)
+
+
+def rectify(pts: list[Pt], mode: str, clear, depth: int = 4) -> list[Pt]:
+    """Turn an any-angle polyline into 45-degree ('45') or orthogonal ('90') segments.
+
+    Each diagonal becomes two legs (axis plus 45, or an L); where neither bend clears the
+    obstacles the segment is halved and each half tried again, so a run that hugs a part
+    becomes a staircase of small legal steps. A leg that still cannot be rectified at the
+    smallest step stays as it was, so the result is never worse than the input.
+    """
+    if mode not in ('45', '90'):
+        return pts
+
+    def legs(a: Pt, b: Pt) -> list[list[Pt]]:
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        if abs(dx) < 1e-9 or abs(dy) < 1e-9:
+            return [[a, b]]
+        if mode == '45':
+            if abs(abs(dx) - abs(dy)) < 1e-9:
+                return [[a, b]]
+            return _canonical(a, b, 0.0)
+        return [[a, (b[0], a[1]), b], [a, (a[0], b[1]), b]]
+
+    def fix(a: Pt, b: Pt, d: int) -> list[Pt]:
+        for cand in legs(a, b):
+            if all(clear(*p, *q) for p, q in zip(cand, cand[1:])):
+                return cand[1:]
+        if d <= 0:
+            return [b]
+        m = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
+        first = fix(a, m, d - 1)
+        return first + fix(first[-1], b, d - 1)
+
+    out = [pts[0]]
+    for a, b in zip(pts, pts[1:]):
+        out += fix(a, b, depth)
+    return _merge(out)

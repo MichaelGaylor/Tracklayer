@@ -240,3 +240,21 @@ def test_layer_cost_moves_runs_inside():
     plain = top_share(Options(verbose=False))
     dear = top_share(Options(verbose=False, layer_costs={'F.Cu': 3.0}))
     assert dear < plain
+
+
+def test_shape_engine_angles():
+    b = _load(header_and_chip())
+    for mode, ok in (('45', lambda a: a % 45 < 1e-6 or 45 - a % 45 < 1e-6), ('90', lambda a: a % 90 < 1e-6 or 90 - a % 90 < 1e-6)):
+        r = ShapeRouter(b, _nets(b), Options(verbose=False, angles=mode))
+        r.run()
+        assert not r.unrouted
+        _clearance_ok(b, r.routes)
+        total = bad = 0.0
+        for rt in r.routes.values():
+            for layer, x1, y1, x2, y2, w in rt.segments:
+                L = math.hypot(x2 - x1, y2 - y1)
+                ang = math.degrees(math.atan2(y2 - y1, x2 - x1)) % 180
+                total += L
+                if not ok(ang):
+                    bad += L
+        assert bad / total < 0.1, f'{mode}: {100 * bad / total:.0f}% of track off-angle'

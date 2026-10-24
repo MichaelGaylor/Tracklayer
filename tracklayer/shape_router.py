@@ -26,6 +26,7 @@ from .geom import capsule_mask, cells_of, circle_mask
 from .router import ALL, FREE, NetRoute, Options, RouteClass, Router, _seg_dist
 from .shapes import (SLACK, Obstacles, capsule_polygon, circle_polygon, point_in_polygon, polygon_grown,
                      rrect_polygon)
+from .smooth import rectify
 
 INF = float('inf')
 
@@ -382,7 +383,11 @@ class ShapeRouter:
         new_pts = set()
         for k, (l, pts) in enumerate(runs):
             o = obs[l]
-            pts = self._pull(pts, lambda a, b: not o.blocked(a[0], a[1], b[0], b[1], net))
+            def clear(x1, y1, x2, y2, _o=o):
+                return not _o.blocked(x1, y1, x2, y2, net)
+            pts = self._pull(pts, lambda a, b: clear(a[0], a[1], b[0], b[1]))
+            if self.o.angles in ('45', '90'):
+                pts = rectify(pts, self.o.angles, clear)
             layer = self.layers[l]
             for (x1, y1), (x2, y2) in zip(pts, pts[1:]):
                 if math.hypot(x2 - x1, y2 - y1) < 1e-6:
