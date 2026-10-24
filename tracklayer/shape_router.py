@@ -200,6 +200,8 @@ class ShapeRouter:
             return r
         obs = self._class_obstacles(c)
         via_ok = self._via_ok(net, c)
+        neck_cls = self.gr.neck_of.get(net)
+        neck = None
         name = self.b.net_name(net)
         comps.sort(key=len, reverse=True)
         tree = set(comps[0])
@@ -207,16 +209,22 @@ class ShapeRouter:
         labels = self.gr._labels
         while others:
             targets = {p for comp in others for p in comp}
+            where = {(l, round(x, 4), round(y, 4)): i for i, comp in enumerate(others) for (l, x, y) in comp}
+            use_obs, width = obs, w
             path = self._astar(net, c, obs, via_ok, tree, targets)
+            if path is None and neck_cls is not None:
+                # the full width cannot leave or reach a pad cleanly: try the narrower escape width
+                if neck is None:
+                    neck = (self._class_obstacles(neck_cls), self._via_ok(net, neck_cls))
+                use_obs, width = neck[0], neck_cls.width
+                path = self._astar(net, neck_cls, neck[0], neck[1], tree, targets)
             if path is None:
                 what = sorted({labels.get((l,) + self.g.to_cell(x, y), '') for (l, x, y) in targets} - {''})[:6]
                 self.say(f'  {name}: no path for {len(others)} remaining connection(s) ({", ".join(what) or "copper"})')
                 r.complete = False
                 break
-            end = path[-1]
-            k = next(i for i, comp in enumerate(others) if end in comp)
-            reached = others.pop(k)
-            new_pts = self._emit(r, path, obs, net, w)
+            reached = others.pop(where[path[-1]])
+            new_pts = self._emit(r, path, use_obs, net, width)
             tree |= set(reached)
             tree |= new_pts
         return r
