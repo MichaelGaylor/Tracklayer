@@ -41,6 +41,21 @@ including CI. It reads KiCad 7, 8, 9 and 10 board files, and the net classes fro
 * **Any number of copper layers** with through vias. Multilayer boards are routed on every
   copper layer in the stack, or on the ones you name with `--layers F.Cu,B.Cu`.
 
+## Inside KiCad
+
+There is a plugin for the PCB editor: a dialog with the main options, a live log, and the
+result added straight to the open board as one change (so Undo takes it back), with the zones
+refilled afterwards. Install it with
+
+```
+python install_kicad_plugin.py
+```
+
+which copies the plugin and the router into KiCad's user plugin folder for every KiCad version
+it finds under Documents/KiCad (pass `--dir` for another folder). Then in the PCB editor use
+Tools > External Plugins > Tracklayer autoroute, or the toolbar button. Hand-route and lock
+anything critical first; the plugin keeps existing tracks and routes the rest.
+
 ## Options worth knowing
 
 | Option | Default | What it does |

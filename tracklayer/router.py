@@ -775,12 +775,14 @@ class Router:
         return sorted(bad)
 
     def _order(self, nets) -> list[int]:
+        """Fat and wide-clearance nets first (they have the fewest options), then short before long."""
         def key(n):
+            w, cl, vd, _ = self.net_params(n)
             ps = [p for p in self.b.pads if p.net == n]
             if len(ps) < 2:
-                return (1, 0.0)
+                return (-(w + cl), 1, 0.0)
             xs = [p.x for p in ps]; ys = [p.y for p in ps]
-            return (0, (max(xs) - min(xs)) + (max(ys) - min(ys)) + 0.5 * len(ps))
+            return (-(w + cl), 0, (max(xs) - min(xs)) + (max(ys) - min(ys)) + 0.5 * len(ps))
         return sorted(nets, key=key)
 
 
