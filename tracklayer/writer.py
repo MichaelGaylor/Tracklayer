@@ -13,11 +13,11 @@ from .board import Board
 from .sexp import fmt
 
 
-def write_board(board: Board, routes, replace_nets: set[int] | None = None, out_path: str | None = None) -> str:
+def write_board(board: Board, routes, remove=None, out_path: str | None = None) -> str:
+    """`remove`: existing Track/Via objects (with their source spans) to delete from the file first."""
     text = board.text
-    if replace_nets:
-        spans = [t.span for t in board.tracks if t.net in replace_nets and not t.locked and t.span]
-        spans += [v.span for v in board.vias if v.net in replace_nets and not v.locked and v.span]
+    if remove:
+        spans = [it.span for it in remove if it.span]
         for a, b in sorted(set(spans), reverse=True):
             # also eat the whitespace before the node so the file stays tidy
             while a > 0 and text[a - 1] in ' \t':

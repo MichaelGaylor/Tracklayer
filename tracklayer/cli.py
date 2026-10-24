@@ -48,9 +48,6 @@ def main(argv=None) -> int:
 
     t0 = time.time()
     b = load(a.board, a.pro)
-    if a.replace:
-        # the router must not see the tracks that are about to be removed
-        pass
     all_nets = {code for code in b.nets if code > 0}
     nets = match_nets(b, a.nets) if a.nets else set(all_nets)
     nets -= match_nets(b, a.exclude) if a.exclude else set()
@@ -59,7 +56,10 @@ def main(argv=None) -> int:
     for p in b.pads:
         counts[p.net] = counts.get(p.net, 0) + 1
     nets = {n for n in nets if counts.get(n, 0) >= 2 or any(z.net == n and not z.is_keepout for z in b.zones)}
+    doomed = []
     if a.replace:
+        # the router must not see the tracks that are about to be removed, and the writer must
+        doomed = [t for t in b.tracks if t.net in nets and not t.locked] + [v for v in b.vias if v.net in nets and not v.locked]
         b.tracks = [t for t in b.tracks if not (t.net in nets and not t.locked)]
         b.vias = [v for v in b.vias if not (v.net in nets and not v.locked)]
     opts = Options(pitch=a.pitch, layers=a.layers.split(',') if a.layers else None, passes=a.passes,
@@ -75,7 +75,7 @@ def main(argv=None) -> int:
     r = Router(b, nets, opts)
     r.run()
     out = a.board if a.in_place else (a.output or os.path.splitext(a.board)[0] + '-routed.kicad_pcb')
-    write_board(b, r.routes, nets if a.replace else None, out)
+    write_board(b, r.routes, doomed, out)
     print(f'wrote {out}')
     if a.svg:
         write_svg(b, r.routes, a.svg, r.unrouted)

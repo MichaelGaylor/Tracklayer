@@ -130,6 +130,25 @@ def test_writer_round_trip():
     assert sum(len(rt.segments) for rt in r2.routes.values()) == 0
 
 
+def test_replace_removes_old_tracks():
+    b = _load(two_resistors())
+    r = Router(b, _nets(b), Options(verbose=False))
+    r.run()
+    out = os.path.join(tempfile.mkdtemp(), 'o.kicad_pcb')
+    write_board(b, r.routes, None, out)
+    b2 = load(out)
+    n_first = len(b2.tracks)
+    doomed = [t for t in b2.tracks] + [v for v in b2.vias]
+    b2.tracks, b2.vias = [], []
+    r2 = Router(b2, _nets(b2), Options(verbose=False))
+    r2.run()
+    out2 = os.path.join(tempfile.mkdtemp(), 'o2.kicad_pcb')
+    write_board(b2, r2.routes, doomed, out2)
+    b3 = load(out2)
+    assert len(b3.tracks) == sum(len(rt.segments) for rt in r2.routes.values())
+    assert n_first > 0 and len(b3.tracks) <= n_first + 2
+
+
 def test_smoothing_45():
     # a staircase of 0.2 mm steps: diagonal then horizontal
     pts = [(0, 0), (0.2, 0.2), (0.4, 0.4), (0.6, 0.4), (0.8, 0.4), (1.0, 0.4)]
