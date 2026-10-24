@@ -9,8 +9,8 @@ two entries, "Tracklayer autoroute" (API) and "Tracklayer autoroute (classic)".
     python install_kicad_plugin.py --dir DIR  # a specific scripting/plugins folder
     python install_kicad_plugin.py --link     # symlink the checkout instead of copying (for development)
 
-Afterwards start the PCB editor (or Tools > External Plugins > Refresh Plugins). The dialog is
-under Tools > External Plugins > Tracklayer autoroute, and on the toolbar.
+Afterwards start the PCB editor (or Tools > External Plugins > Refresh Plugins). The API plugin is
+the red and blue tracks button on the toolbar; the classic one is under Tools > External Plugins.
 """
 import argparse
 import os

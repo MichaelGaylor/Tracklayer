@@ -63,7 +63,9 @@ refilled afterwards. It comes in two flavours in the same package: the **API plu
 KiCad 9 and later (the open board is fetched and the tracks pushed back over KiCad's IPC API;
 enable it once under Preferences > Plugins > Enable KiCad API, and the first run sets up its
 Python environment), and the **classic plugin** for KiCad 8 to 10, which the KiCad team is
-retiring in version 11. On 9 and 10 you will see both entries; use the API one. Install it with
+retiring in version 11. The API plugin appears as a toolbar button (the red and blue tracks icon)
+and the classic one under Tools > External Plugins as "Tracklayer autoroute (classic)"; use the
+API one where you have it. Install it with
 
 ```
 python install_kicad_plugin.py
