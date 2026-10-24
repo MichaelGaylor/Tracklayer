@@ -224,7 +224,17 @@ class ShapeRouter:
                 r.complete = False
                 break
             reached = others.pop(where[path[-1]])
+            n_vias = len(r.vias)
             new_pts = self._emit(r, path, use_obs, net, width)
+            for (vx_, vy_) in r.vias[n_vias:]:
+                # no later via of this net may overlap this one (hole to hole)
+                j0, i0, m = circle_mask(self.g, vx_, vy_, vd + cl)
+                if m is not None:
+                    win = via_ok[j0:j0 + m.shape[0], i0:i0 + m.shape[1]]
+                    win[m[:win.shape[0], :win.shape[1]]] = False
+                if neck is not None:
+                    win2 = neck[1][j0:j0 + m.shape[0], i0:i0 + m.shape[1]]
+                    win2[m[:win2.shape[0], :win2.shape[1]]] = False
             tree |= set(reached)
             tree |= new_pts
         return r
@@ -323,8 +333,13 @@ class ShapeRouter:
                         gscore[nk] = ng; parent[nk] = k
                         heapq.heappush(heap, (ng + W * float(np.hypot(tx - qx, ty - qy).min()), l, qx, qy))
                 else:
-                    base = gc + float(dist[q]) + via_cost
+                    # a via spot: first the track to it on this layer, then the layer change
                     hq = W * float(np.hypot(tx - qx, ty - qy).min())
+                    here = key(l, qx, qy)
+                    ng = gc + float(dist[q])
+                    if ng < gscore.get(here, INF):
+                        gscore[here] = ng; parent[here] = k     # a waypoint for the path, not a state to expand
+                    base = ng + via_cost
                     for l2 in range(L):
                         if l2 == l:
                             continue
@@ -332,7 +347,7 @@ class ShapeRouter:
                         if nk in closed:
                             continue
                         if base < gscore.get(nk, INF):
-                            gscore[nk] = base; parent[nk] = k
+                            gscore[nk] = base; parent[nk] = here
                             heapq.heappush(heap, (base + hq, l2, qx, qy))
         return None
 
