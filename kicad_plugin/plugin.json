@@ -1,0 +1,23 @@
+{
+  "$schema": "https://go.kicad.org/api/schemas/v1",
+  "identifier": "com.github.michaelgaylor.tracklayer",
+  "name": "Tracklayer autoroute",
+  "description": "Autoroute the open board: exact-geometry (shape) or grid engine, any number of copper layers.",
+  "description_full": "Tracklayer routes the unrouted nets of the open board and adds the tracks and vias as one undoable change, then refills the zones. Made by Tiggy Engineering, www.tiggyengineering.com",
+  "runtime": {
+    "type": "python",
+    "min_version": "3.9"
+  },
+  "actions": [
+    {
+      "identifier": "autoroute",
+      "name": "Tracklayer autoroute",
+      "description": "Route the unrouted nets of this board with Tracklayer",
+      "show-button": true,
+      "scopes": ["pcb"],
+      "entrypoint": "tracklayer_ipc.py",
+      "icons-light": ["icon.png"],
+      "icons-dark": ["icon.png"]
+    }
+  ]
+}

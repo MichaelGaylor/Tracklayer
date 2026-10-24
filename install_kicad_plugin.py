@@ -1,4 +1,9 @@
-"""Install (or update) the Tracklayer plugin into KiCad's user plugin folder.
+"""Install (or update) the Tracklayer plugin into KiCad's user plugin folders.
+
+KiCad 8 to 10 load the classic plugin from <KiCad>/<version>/scripting/plugins; KiCad 9 and
+later also load the IPC API plugin from <KiCad>/<version>/plugins (enable it under
+Preferences > Plugins > Enable KiCad API). Both are the same code; on 9 and 10 you will see
+two entries, "Tracklayer autoroute" (API) and "Tracklayer autoroute (classic)".
 
     python install_kicad_plugin.py            # every KiCad version found under Documents/KiCad
     python install_kicad_plugin.py --dir DIR  # a specific scripting/plugins folder
@@ -32,7 +37,11 @@ def candidate_dirs():
             continue
         for ver in sorted(os.listdir(root)):
             if ver[:1].isdigit() and os.path.isdir(os.path.join(root, ver)):
-                out.append(os.path.join(root, ver, 'scripting', 'plugins'))
+                major = int(ver.split('.')[0])
+                if major <= 10:
+                    out.append(os.path.join(root, ver, 'scripting', 'plugins'))   # classic (SWIG) plugin
+                if major >= 9:
+                    out.append(os.path.join(root, ver, 'plugins'))                # IPC API plugin
     return out
 
 
@@ -66,6 +75,7 @@ def main():
     for d in dirs:
         print('installed to', install(d, a.link))
     print('Now open the PCB editor: Tools > External Plugins > Tracklayer autoroute')
+    print('KiCad 9+: enable the API under Preferences > Plugins if it is off; the first run sets up a Python environment')
     return 0
 
 

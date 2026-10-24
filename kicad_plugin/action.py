@@ -228,7 +228,7 @@ class TracklayerDialog(wx.Dialog):
 
 class TracklayerAction(pcbnew.ActionPlugin):
     def defaults(self):
-        self.name = 'Tracklayer autoroute'
+        self.name = 'Tracklayer autoroute (classic)'
         self.category = 'Routing'
         self.description = 'Route the unrouted nets of this board with Tracklayer'
         self.show_toolbar_button = True

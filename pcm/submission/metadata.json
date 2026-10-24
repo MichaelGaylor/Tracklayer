@@ -30,7 +30,7 @@
   ],
   "versions": [
     {
-      "version": "0.1.0",
+      "version": "0.2.0",
       "status": "testing",
       "kicad_version": "8.0",
       "platforms": [
@@ -38,10 +38,10 @@
         "macos",
         "linux"
       ],
-      "download_url": "https://github.com/MichaelGaylor/Tracklayer/releases/download/v0.1.0/tracklayer-pcm-0.1.0.zip",
-      "download_sha256": "088934e73c9260ebca0692ee63246ed9e73951714a491864601432536f8da970",
-      "download_size": 43582,
-      "install_size": 134406
+      "download_url": "https://github.com/MichaelGaylor/Tracklayer/releases/download/v0.2.0/tracklayer-pcm-0.2.0.zip",
+      "download_sha256": "5509c45283ffae68016f066d3953440bc02fa4be57fae6cd0e358f657b7d998e",
+      "download_size": 47593,
+      "install_size": 145975
     }
   ]
 }
