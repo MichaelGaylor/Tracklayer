@@ -29,7 +29,7 @@ def plugin_tree():
     out = []
     src = os.path.join(ROOT, 'kicad_plugin')
     for name in os.listdir(src):
-        if name.endswith('.py') or name == 'icon.png':
+        if name.endswith('.py') or name in ('icon.png', 'plugin.json', 'requirements.txt'):
             if name == 'make_icon.py':
                 continue
             out.append(('plugins/' + name, os.path.join(src, name)))
@@ -51,7 +51,8 @@ def metadata(download_url: str, sha: str, dl_size: int, inst_size: int) -> dict:
             'the clearance plus half the track width and tracks run corner to corner, so clearances are met exactly '
             'and tight escapes from fine-pitch pads just work. The grid engine gives classic 45-degree tracks. Net '
             'classes, locked and hand-routed copper, keep-outs and pours are respected. Any number of copper layers '
-            'with through vias.\n\nTools > External Plugins > Tracklayer autoroute. Pure Python, needs nothing beyond KiCad.\n\n'
+            'with through vias.\n\nTools > External Plugins > Tracklayer autoroute. Pure Python. KiCad 9 and later run it through '
+            'the KiCad API (enable it under Preferences > Plugins); KiCad 8 to 10 also get the classic plugin.\n\n'
             'Made by Tiggy Engineering (www.tiggyengineering.com). Free and open source; if it saves you an '
             'evening, have a look at what we make, or buy us a beer.'
         ),
