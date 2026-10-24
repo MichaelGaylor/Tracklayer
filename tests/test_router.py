@@ -258,3 +258,30 @@ def test_shape_engine_angles():
                 if not ok(ang):
                     bad += L
         assert bad / total < 0.1, f'{mode}: {100 * bad / total:.0f}% of track off-angle'
+
+
+def test_existing_via_blocks_inner_layers():
+    """A through via already on a six-layer board must be an obstacle on the inner layers too."""
+    b = _load(header_and_chip(layers=6))
+    via = ('	(via
+		(at 15 10)
+		(size 1.2)
+		(drill 0.6)
+		(layers "F.Cu" "B.Cu")
+		(net "D0")
+	)
+')
+    text = header_and_chip(layers=6).replace('
+)
+', '
+' + via + ')
+')
+    b = _load(text)
+    assert len(b.vias) == 1 and b.vias[0].layers == b.copper_layers
+    nets = _nets(b) - {b.net_code('D0')}
+    for engine in (ShapeRouter, Router):
+        r = engine(b, nets, Options(verbose=False))
+        r.run()
+        for rt in r.routes.values():
+            for layer, x1, y1, x2, y2, w in rt.segments:
+                assert _seg_dist(x1, y1, x2, y2, 15, 10, 15, 10) >= 0.6 + w / 2 + 0.2 - 1e-6, (engine.__name__, layer)

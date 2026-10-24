@@ -207,6 +207,14 @@ def _arc_points(p0: Pt, pm: Pt, p1: Pt, n: int = 16) -> list[Pt]:
     return [(ux + r * math.cos(a0 + total * k / n), uy + r * math.sin(a0 + total * k / n)) for k in range(n + 1)]
 
 
+def _via_span(copper: list[str], named: list[str]) -> list[str]:
+    """All copper layers a via passes through, given the layers the file names for it."""
+    idx = [copper.index(l) for l in named if l in copper]
+    if not idx:
+        return [l for l in named]
+    return copper[min(idx):max(idx) + 1]
+
+
 def _chain(segments: list[tuple[Pt, Pt]], tol: float = 0.01) -> list[list[Pt]]:
     """Join loose edge segments into closed polygons."""
     segs = [list(s) for s in segments]
@@ -330,8 +338,10 @@ def load(path: str, pro_path: str | None = None) -> Board:
                                       b.net_ref(g), g.value('locked') == 'yes'))
         elif k == 'via':
             lay = g.values('layers') or [b.copper_layers[0], b.copper_layers[-1]]
+            # a via drills through every copper layer between the two it names
+            lay = _via_span(b.copper_layers, list(lay))
             v = Via(*_xy(g.find('at')), num(g.value('size', '0.8')), num(g.value('drill', '0.4')),
-                    b.net_ref(g), list(lay), g.value('locked') == 'yes')
+                    b.net_ref(g), lay, g.value('locked') == 'yes')
             v.span = g.span
             b.vias.append(v)
         elif k == 'zone':
