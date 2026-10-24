@@ -2,25 +2,26 @@
   "$schema": "https://go.kicad.org/pcm/schemas/v1",
   "name": "Tracklayer autorouter",
   "description": "Autoroute the open board: exact-geometry (shape) or grid engine, any number of copper layers.",
-  "description_full": "Tracklayer routes the unrouted nets of the open board and adds the tracks and vias as one undoable change, then refills the zones. The shape engine works on exact geometry: every obstacle is grown by the clearance plus half the track width and tracks run corner to corner, so clearances are met exactly and tight escapes from fine-pitch pads just work. The grid engine gives classic 45-degree tracks. Net classes, locked and hand-routed copper, keep-outs and pours are respected. Any number of copper layers with through vias.\n\nTools > External Plugins > Tracklayer autoroute. Pure Python, needs nothing beyond KiCad.",
+  "description_full": "Tracklayer routes the unrouted nets of the open board and adds the tracks and vias as one undoable change, then refills the zones. The shape engine works on exact geometry: every obstacle is grown by the clearance plus half the track width and tracks run corner to corner, so clearances are met exactly and tight escapes from fine-pitch pads just work. The grid engine gives classic 45-degree tracks. Net classes, locked and hand-routed copper, keep-outs and pours are respected. Any number of copper layers with through vias.\n\nTools > External Plugins > Tracklayer autoroute. Pure Python, needs nothing beyond KiCad.\n\nMade by Tiggy Engineering (www.tiggyengineering.com). Free and open source; if it saves you an evening, have a look at what we make, or buy us a beer.",
   "identifier": "com.github.michaelgaylor.tracklayer",
   "type": "plugin",
   "author": {
-    "name": "Mike Gaylor",
+    "name": "Mike Gaylor, Tiggy Engineering",
     "contact": {
-      "web": "https://github.com/MichaelGaylor/Tracklayer"
+      "web": "https://www.tiggyengineering.com"
     }
   },
   "maintainer": {
-    "name": "Mike Gaylor",
+    "name": "Mike Gaylor, Tiggy Engineering",
     "contact": {
-      "web": "https://github.com/MichaelGaylor/Tracklayer"
+      "web": "https://www.tiggyengineering.com"
     }
   },
   "license": "MIT",
   "resources": {
     "homepage": "https://github.com/MichaelGaylor/Tracklayer",
-    "Issues": "https://github.com/MichaelGaylor/Tracklayer/issues"
+    "Issues": "https://github.com/MichaelGaylor/Tracklayer/issues",
+    "Tiggy Engineering": "https://www.tiggyengineering.com"
   },
   "tags": [
     "routing",
@@ -38,9 +39,9 @@
         "linux"
       ],
       "download_url": "https://github.com/MichaelGaylor/Tracklayer/releases/download/v0.1.0/tracklayer-pcm-0.1.0.zip",
-      "download_sha256": "1f4780e988de6fb1d6f8b78fe4dd25648d062ae4fbadd5a2380717418e267279",
-      "download_size": 42526,
-      "install_size": 128950
+      "download_sha256": "b659e335c664af4cf9656a477db52a6dee801b346cb7b72d4b44498485f95582",
+      "download_size": 42661,
+      "install_size": 129019
     }
   ]
 }

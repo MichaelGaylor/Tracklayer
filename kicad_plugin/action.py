@@ -129,7 +129,8 @@ class TracklayerDialog(wx.Dialog):
         self.SetMinSize(self.GetSize())
         try:
             version = _tracklayer()[0]
-            self.say(f'Tracklayer {version} ready. Board: {os.path.basename(board.GetFileName()) or "(unsaved)"}')
+            self.say(f'Tracklayer {version} by Tiggy Engineering  -  www.tiggyengineering.com')
+            self.say(f'Board: {os.path.basename(board.GetFileName()) or "(unsaved)"}')
         except Exception as e:
             self.say(f'Tracklayer could not be imported: {e}')
             self.run_btn.Disable()

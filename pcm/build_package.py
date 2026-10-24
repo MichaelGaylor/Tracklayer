@@ -21,6 +21,7 @@ sys.path.insert(0, ROOT)
 from tracklayer import __version__  # noqa: E402
 
 IDENT = 'com.github.michaelgaylor.tracklayer'
+SITE = 'https://www.tiggyengineering.com'
 
 
 def plugin_tree():
@@ -50,15 +51,18 @@ def metadata(download_url: str, sha: str, dl_size: int, inst_size: int) -> dict:
             'the clearance plus half the track width and tracks run corner to corner, so clearances are met exactly '
             'and tight escapes from fine-pitch pads just work. The grid engine gives classic 45-degree tracks. Net '
             'classes, locked and hand-routed copper, keep-outs and pours are respected. Any number of copper layers '
-            'with through vias.\n\nTools > External Plugins > Tracklayer autoroute. Pure Python, needs nothing beyond KiCad.'
+            'with through vias.\n\nTools > External Plugins > Tracklayer autoroute. Pure Python, needs nothing beyond KiCad.\n\n'
+            'Made by Tiggy Engineering (www.tiggyengineering.com). Free and open source; if it saves you an '
+            'evening, have a look at what we make, or buy us a beer.'
         ),
         'identifier': IDENT,
         'type': 'plugin',
-        'author': {'name': 'Mike Gaylor', 'contact': {'web': 'https://github.com/MichaelGaylor/Tracklayer'}},
-        'maintainer': {'name': 'Mike Gaylor', 'contact': {'web': 'https://github.com/MichaelGaylor/Tracklayer'}},
+        'author': {'name': 'Mike Gaylor, Tiggy Engineering', 'contact': {'web': SITE}},
+        'maintainer': {'name': 'Mike Gaylor, Tiggy Engineering', 'contact': {'web': SITE}},
         'license': 'MIT',
         'resources': {'homepage': 'https://github.com/MichaelGaylor/Tracklayer',
-                      'Issues': 'https://github.com/MichaelGaylor/Tracklayer/issues'},
+                      'Issues': 'https://github.com/MichaelGaylor/Tracklayer/issues',
+                      'Tiggy Engineering': SITE},
         'tags': ['routing', 'autorouter', 'pcb'],
         'versions': [{
             'version': __version__,
