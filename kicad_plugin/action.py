@@ -86,13 +86,17 @@ class TracklayerDialog(wx.Dialog):
             grid.Add(c, 1, wx.EXPAND)
             return c
 
-        self.pitch = field('Grid pitch (mm)', '0.2', 'Smaller finds narrower gaps and is slower. Use 0.1 for SOIC or finer.')
+        self.pitch = field('Grid pitch (mm)', '0.2', 'Grid engine only: smaller finds narrower gaps and is slower. Shape engine: via lattice pitch.')
         self.passes = field('Rip-up passes', '8')
         self.via_cost = field('Via cost (mm of track)', '4', 'Raise for fewer vias')
         self.bend_cost = field('Bend cost (mm)', '0.3')
         self.nets = field('Only nets (patterns)', '', 'Space separated, e.g. D* CLK; empty routes everything unrouted')
         self.exclude = field('Skip nets (patterns)', '')
-        grid.Add(wx.StaticText(p, label='Corners'), 0, wx.ALIGN_CENTER_VERTICAL)
+        grid.Add(wx.StaticText(p, label='Engine'), 0, wx.ALIGN_CENTER_VERTICAL)
+        self.engine = wx.Choice(p, choices=['shape (exact geometry, any angle)', 'grid (45 degree tracks)'])
+        self.engine.SetSelection(0)
+        grid.Add(self.engine, 1, wx.EXPAND)
+        grid.Add(wx.StaticText(p, label='Corners (grid engine)'), 0, wx.ALIGN_CENTER_VERTICAL)
         self.angles = wx.Choice(p, choices=['45 degrees', 'any angle', '90 degrees'])
         self.angles.SetSelection(0)
         grid.Add(self.angles, 1, wx.EXPAND)
@@ -137,7 +141,8 @@ class TracklayerDialog(wx.Dialog):
         _, _, _, Options, _ = _tracklayer()
         angles = ['45', 'any', '90'][self.angles.GetSelection()]
         layers = [l.strip() for l in self.layers.GetValue().split(',') if l.strip()]
-        return Options(pitch=float(self.pitch.GetValue()), passes=int(self.passes.GetValue()),
+        engine = ['shape', 'grid'][self.engine.GetSelection()]
+        return Options(engine=engine, via_pitch=float(self.pitch.GetValue()), pitch=float(self.pitch.GetValue()), passes=int(self.passes.GetValue()),
                        via_cost=float(self.via_cost.GetValue()), bend_cost=float(self.bend_cost.GetValue()),
                        angles=angles, layers=layers or None, route_zone_nets=self.zone_nets.GetValue(), verbose=False)
 
@@ -179,7 +184,11 @@ class TracklayerDialog(wx.Dialog):
                 b.tracks = [t for t in b.tracks if not (t.net in nets and not t.locked)]
                 b.vias = [v for v in b.vias if not (v.net in nets and not v.locked)]
             wx.CallAfter(self.say, f'{len(b.pads)} pads, {len(nets)} nets to route, {len(b.tracks)} existing tracks kept')
-            r = Router(b, nets, opts)
+            if opts.engine == 'shape':
+                from tracklayer.shape_router import ShapeRouter
+                r = ShapeRouter(b, nets, opts)
+            else:
+                r = Router(b, nets, opts)
             orig_say = r.say
 
             def say(*a):

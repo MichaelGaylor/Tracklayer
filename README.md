@@ -17,6 +17,20 @@ Tracklayer is pure Python with numpy. It does not need KiCad installed, so it ru
 including CI. It reads KiCad 7, 8, 9 and 10 board files, and the net classes from the project's
 `.kicad_pro`.
 
+## Two engines
+
+**Shape** (the default) routes on exact geometry. Every piece of copper that is not the net
+being routed becomes a polygon grown by the clearance plus half the track width, and tracks run
+in straight lines from corner to corner of those polygons, so clearances are met exactly (to a
+few microns, never a grid's worth) and tight escapes from fine-pitch pads just work. Tracks come
+out at any angle. Vias sit on a fine lattice of spots that are legal on every layer.
+
+**Grid** (`--engine grid`) is a raster A* with 45-degree output. It is faster on big sparse
+boards and gives the classic look, at the price of a clearance margin tied to the grid pitch.
+
+Both route every copper layer in the board's stack with through vias: two, four, six, as many
+as the board has. Blind and buried vias are not supported.
+
 ## What it does
 
 * **Net classes are honoured.** Track width, clearance, via size and drill come from each net's
@@ -60,7 +74,9 @@ anything critical first; the plugin keeps existing tracks and routes the rest.
 
 | Option | Default | What it does |
 | --- | --- | --- |
-| `--pitch` | 0.2 mm | Grid pitch. Smaller is slower and finds narrower gaps. |
+| `--engine` | shape | `shape` or `grid`, see above. |
+| `--pitch` | 0.2 mm | Grid engine: grid pitch. Smaller is slower and finds narrower gaps. |
+| `--via-pitch` | 0.25 mm | Shape engine: spacing of the candidate via spots. |
 | `--passes` | 8 | Rip-up and reroute passes. |
 | `--via-cost` | 4 mm | How much track a via is worth. Raise it for fewer vias. |
 | `--bend-cost` | 0.3 mm | Price of a direction change. |
@@ -72,7 +88,7 @@ anything critical first; the plugin keeps existing tracks and routes the rest.
 | `--via-in-pad` | | Allow vias inside SMD pads of the same net. |
 | `--in-place` | | Write the routes into the input file instead of a copy. |
 
-## How it works
+## How the grid engine works
 
 The board is rasterised onto a square grid, one plane per copper layer. For every route class
 (track width, clearance, via size) each cell records which net's copper, grown by the clearance
@@ -81,7 +97,7 @@ does. Each net is then routed as a tree: its connected pieces of copper are join
 by a multi-source A* search with eight neighbours per layer and vias between layers. Finished
 routes are smoothed, checked again against the same rasters, and painted back in as obstacles.
 
-Because the check is done at cell centres, every clearance carries a small safety margin of
+In the grid engine, because the check is done at cell centres, every clearance carries a small safety margin of
 0.71 times the grid pitch (0.14 mm at the default pitch). That makes the result conservative:
 KiCad's DRC should never complain, but a gap only just wide enough for a track will be refused
 at the default pitch. Use `--pitch 0.1` for boards with SOIC or finer pitch parts, or when a
