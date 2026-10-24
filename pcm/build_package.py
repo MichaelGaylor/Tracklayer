@@ -28,11 +28,9 @@ def plugin_tree():
     """(archive path, file path) for everything that goes under plugins/."""
     out = []
     src = os.path.join(ROOT, 'kicad_plugin')
-    for name in os.listdir(src):
-        if name.endswith('.py') or name in ('icon.png', 'plugin.json', 'requirements.txt'):
-            if name == 'make_icon.py':
-                continue
-            out.append(('plugins/' + name, os.path.join(src, name)))
+    # the PCM package is the IPC API plugin only (KiCad 9+); the classic plugin is for the installer script
+    for name in ('plugin.json', 'requirements.txt', 'tracklayer_ipc.py', 'icon.png'):
+        out.append(('plugins/' + name, os.path.join(src, name)))
     lib = os.path.join(ROOT, 'tracklayer')
     for name in os.listdir(lib):
         if name.endswith('.py'):
@@ -42,7 +40,7 @@ def plugin_tree():
 
 def metadata(download_url: str, sha: str, dl_size: int, inst_size: int) -> dict:
     return {
-        '$schema': 'https://go.kicad.org/pcm/schemas/v1',
+        '$schema': 'https://go.kicad.org/pcm/schemas/v2',
         'name': 'Tracklayer autorouter',
         'description': 'Autoroute the open board: exact-geometry (shape) or grid engine, any number of copper layers.',
         'description_full': (
@@ -51,8 +49,8 @@ def metadata(download_url: str, sha: str, dl_size: int, inst_size: int) -> dict:
             'the clearance plus half the track width and tracks run corner to corner, so clearances are met exactly '
             'and tight escapes from fine-pitch pads just work. The grid engine gives classic 45-degree tracks. Net '
             'classes, locked and hand-routed copper, keep-outs and pours are respected. Any number of copper layers '
-            'with through vias.\n\nTools > External Plugins > Tracklayer autoroute. Pure Python. KiCad 9 and later run it through '
-            'the KiCad API (enable it under Preferences > Plugins); KiCad 8 to 10 also get the classic plugin.\n\n'
+            'with through vias.\n\nTools > External Plugins > Tracklayer autoroute. Pure Python. Runs through the KiCad API: enable it '
+            'once under Preferences > Plugins > Enable KiCad API.\n\n'
             'Made by Tiggy Engineering (www.tiggyengineering.com). Free and open source; if it saves you an '
             'evening, have a look at what we make, or buy us a beer.'
         ),
@@ -68,7 +66,8 @@ def metadata(download_url: str, sha: str, dl_size: int, inst_size: int) -> dict:
         'versions': [{
             'version': __version__,
             'status': 'testing',
-            'kicad_version': '8.0',
+            'runtime': 'ipc',
+            'kicad_version': '9.0',
             'platforms': ['windows', 'macos', 'linux'],
             'download_url': download_url,
             'download_sha256': sha,

@@ -1,8 +1,8 @@
 {
-  "$schema": "https://go.kicad.org/pcm/schemas/v1",
+  "$schema": "https://go.kicad.org/pcm/schemas/v2",
   "name": "Tracklayer autorouter",
   "description": "Autoroute the open board: exact-geometry (shape) or grid engine, any number of copper layers.",
-  "description_full": "Tracklayer routes the unrouted nets of the open board and adds the tracks and vias as one undoable change, then refills the zones. The shape engine works on exact geometry: every obstacle is grown by the clearance plus half the track width and tracks run corner to corner, so clearances are met exactly and tight escapes from fine-pitch pads just work. The grid engine gives classic 45-degree tracks. Net classes, locked and hand-routed copper, keep-outs and pours are respected. Any number of copper layers with through vias.\n\nTools > External Plugins > Tracklayer autoroute. Pure Python. KiCad 9 and later run it through the KiCad API (enable it under Preferences > Plugins); KiCad 8 to 10 also get the classic plugin.\n\nMade by Tiggy Engineering (www.tiggyengineering.com). Free and open source; if it saves you an evening, have a look at what we make, or buy us a beer.",
+  "description_full": "Tracklayer routes the unrouted nets of the open board and adds the tracks and vias as one undoable change, then refills the zones. The shape engine works on exact geometry: every obstacle is grown by the clearance plus half the track width and tracks run corner to corner, so clearances are met exactly and tight escapes from fine-pitch pads just work. The grid engine gives classic 45-degree tracks. Net classes, locked and hand-routed copper, keep-outs and pours are respected. Any number of copper layers with through vias.\n\nTools > External Plugins > Tracklayer autoroute. Pure Python. Runs through the KiCad API: enable it once under Preferences > Plugins > Enable KiCad API.\n\nMade by Tiggy Engineering (www.tiggyengineering.com). Free and open source; if it saves you an evening, have a look at what we make, or buy us a beer.",
   "identifier": "com.github.michaelgaylor.tracklayer",
   "type": "plugin",
   "author": {
@@ -30,32 +30,19 @@
   ],
   "versions": [
     {
-      "version": "0.1.0",
+      "version": "0.2.1",
       "status": "testing",
-      "kicad_version": "8.0",
+      "runtime": "ipc",
+      "kicad_version": "9.0",
       "platforms": [
         "windows",
         "macos",
         "linux"
       ],
-      "download_url": "https://github.com/MichaelGaylor/Tracklayer/releases/download/v0.1.0/tracklayer-pcm-0.1.0.zip",
-      "download_sha256": "088934e73c9260ebca0692ee63246ed9e73951714a491864601432536f8da970",
-      "download_size": 43582,
-      "install_size": 134406
-    },
-    {
-      "version": "0.2.0",
-      "status": "testing",
-      "kicad_version": "8.0",
-      "platforms": [
-        "windows",
-        "macos",
-        "linux"
-      ],
-      "download_url": "https://github.com/MichaelGaylor/Tracklayer/releases/download/v0.2.0/tracklayer-pcm-0.2.0.zip",
-      "download_sha256": "9463c2bb5fd0347096a7c8946c2f37df92fbcfeb6356a4639de9b2ca430597e8",
-      "download_size": 48341,
-      "install_size": 146983
+      "download_url": "https://github.com/MichaelGaylor/Tracklayer/releases/download/v0.2.1/tracklayer-pcm-0.2.1.zip",
+      "download_sha256": "bb0076341743400ec76eebf3dc75dd5c2e7a9b62534af29a5ea7244140cd9700",
+      "download_size": 44084,
+      "install_size": 135704
     }
   ]
 }
