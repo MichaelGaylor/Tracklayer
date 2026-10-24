@@ -189,6 +189,24 @@ class ShapeRouter:
         bad |= ((c.vr != FREE) & (c.vr != net)).any(axis=0)
         return ~bad
 
+    # ------------------------------------------------------------------ pour crossing cost
+    def _zone_factor(self, l: int, x: float, y: float, X: np.ndarray, Y: np.ndarray, net: int) -> np.ndarray:
+        """1 + the mean pour-crossing weight along each candidate segment (another net's pour
+        costs zone_cost per mm for a plane, zone_cost_local for a small pour), sampled every 0.5 mm."""
+        g = self.gr.g
+        zo, zw = self.gr.zone_owner[l], self.gr.zone_w[l]
+        if not zw.any():
+            return np.ones(len(X))
+        n = 12
+        t = (np.arange(n) + 0.5) / n
+        sx = x + (X[:, None] - x) * t[None, :]
+        sy = y + (Y[:, None] - y) * t[None, :]
+        i = np.clip(np.rint((sx - g.x0) / g.pitch).astype(np.int64), 0, g.nx - 1)
+        j = np.clip(np.rint((sy - g.y0) / g.pitch).astype(np.int64), 0, g.ny - 1)
+        own = zo[j, i]
+        w = np.where((own != FREE) & (own != net), zw[j, i], 0.0)
+        return 1.0 + w.mean(axis=1)
+
     # ------------------------------------------------------------------ search
     def _route_net(self, net: int) -> NetRoute:
         w, cl, vd, vdr = self.net_params(net)
@@ -343,13 +361,14 @@ class ShapeRouter:
                 if len(band):
                     blocked[band] = obs[l].blocked_many(x, y, X[band], Y[band], net)
             blocked |= same
+            zf = self._zone_factor(l, x, y, X, Y, net)
             for q in np.nonzero(~blocked)[0]:
                 qx, qy = float(X[q]), float(Y[q])
                 if q < n_plain:
                     nk = key(l, qx, qy)
                     if nk in closed:
                         continue
-                    ng = gc + float(dist[q]) * lc[l]
+                    ng = gc + float(dist[q]) * lc[l] * float(zf[q])
                     if ng < gscore.get(nk, INF):
                         gscore[nk] = ng; parent[nk] = k
                         heapq.heappush(heap, (ng + W * float(np.hypot(tx - qx, ty - qy).min()), l, qx, qy))
@@ -357,7 +376,7 @@ class ShapeRouter:
                     # a via spot: first the track to it on this layer, then the layer change
                     hq = W * float(np.hypot(tx - qx, ty - qy).min())
                     here = key(l, qx, qy)
-                    ng = gc + float(dist[q]) * lc[l]
+                    ng = gc + float(dist[q]) * lc[l] * float(zf[q])
                     if ng < gscore.get(here, INF):
                         gscore[here] = ng; parent[here] = k     # a waypoint for the path, not a state to expand
                     base = ng + via_cost

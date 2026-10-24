@@ -88,7 +88,7 @@ anything critical first; the plugin keeps existing tracks and routes the rest.
 | `--passes` | 8 | Rip-up and reroute passes. |
 | `--via-cost` | 4 mm | How much track a via is worth. Raise it for fewer vias. |
 | `--bend-cost` | 0.3 mm | Price of a direction change. |
-| `--zone-cost` | 0.3 | Extra cost factor for crossing a plane-sized pour of another net. |
+| `--zone-cost` | 0.3 | Extra cost factor for crossing a plane-sized pour of another net (both engines). |
 | `--zone-cost-local` | 2.5 | The same for a small pour. |
 | `--layer-cost F.Cu=1.6` | 1 | Make a layer dearer: long runs move to the other layers, short pad escapes stay. Repeatable. |
 | `--nets A B*` | all | Route only nets matching the patterns. `--exclude` does the opposite. |
