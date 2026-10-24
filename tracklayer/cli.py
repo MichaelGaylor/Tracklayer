@@ -34,6 +34,7 @@ def main(argv=None) -> int:
     ap.add_argument('--bend-cost', type=float, default=0.3)
     ap.add_argument('--zone-cost', type=float, default=0.3, help='penalty factor for crossing another net\'s plane-sized pour')
     ap.add_argument('--zone-cost-local', type=float, default=6.0, help='penalty factor for crossing a smaller pour')
+    ap.add_argument('--search-budget', type=int, default=10000, help='shape engine: expansions per connection before giving up (default 10000)')
     ap.add_argument('--no-zone-nets', action='store_true', help='do not route pads of nets that have pours')
     ap.add_argument('--pour-obstacle', type=float, default=0.0, metavar='FRAC',
                     help='pours covering less than FRAC of the board are hard obstacles for other nets (default off)')
@@ -71,7 +72,7 @@ def main(argv=None) -> int:
     for item in a.layer_cost:
         name, _, val = item.partition('=')
         layer_costs[name.strip()] = float(val or 1.0)
-    opts = Options(engine=a.engine, via_pitch=a.via_pitch, pitch=a.pitch, layer_costs=layer_costs, layers=a.layers.split(',') if a.layers else None, passes=a.passes,
+    opts = Options(engine=a.engine, via_pitch=a.via_pitch, pitch=a.pitch, layer_costs=layer_costs, shape_expansions=a.search_budget, layers=a.layers.split(',') if a.layers else None, passes=a.passes,
                    via_cost=a.via_cost, bend_cost=a.bend_cost, zone_cost=a.zone_cost, zone_cost_local=a.zone_cost_local, angles=a.angles,
                    route_zone_nets=not a.no_zone_nets, via_in_pad=a.via_in_pad, margin=a.margin,
                    pour_obstacle_frac=a.pour_obstacle, pour_depth=a.pour_depth,
