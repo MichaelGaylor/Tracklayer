@@ -14,9 +14,10 @@ def footprint(ref: str, x: float, y: float, rot: float, pads: list[tuple]) -> st
     return '\n'.join(out)
 
 
-def board(width: float, height: float, footprints: list[str], extra: str = '') -> str:
+def board(width: float, height: float, footprints: list[str], extra: str = '', layers: int = 2) -> str:
+    inner = ''.join(f'\t\t({2 * k + 2} "In{k}.Cu" signal)\n' for k in range(1, layers - 1))
     return (f'(kicad_pcb\n\t(version 20260206)\n\t(generator "test")\n'
-            f'\t(layers\n\t\t(0 "F.Cu" signal)\n\t\t(2 "B.Cu" signal)\n\t\t(44 "Edge.Cuts" user)\n\t)\n'
+            f'\t(layers\n\t\t(0 "F.Cu" signal)\n{inner}\t\t(2 "B.Cu" signal)\n\t\t(44 "Edge.Cuts" user)\n\t)\n'
             f'\t(setup\n\t\t(pad_to_mask_clearance 0)\n\t)\n'
             f'\t(gr_rect\n\t\t(start 0 0)\n\t\t(end {width} {height})\n\t\t(layer "Edge.Cuts")\n\t\t(stroke (width 0.1) (type default))\n\t)\n'
             + '\n'.join(footprints) + '\n' + extra + ')\n')
@@ -30,7 +31,7 @@ def two_resistors() -> str:
     return board(30, 20, [r1, r2])
 
 
-def header_and_chip() -> str:
+def header_and_chip(layers: int = 2) -> str:
     """A 2x4 through-hole header wired to an 8-pin SOIC: eight nets, some must cross."""
     pins = []
     nets = ['D0', 'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7']
@@ -47,7 +48,7 @@ def header_and_chip() -> str:
         idx = n if n < 4 else 7 - n
         soic.append((str(n + 1), 'smd', 'rect', side * 2.7, -1.905 + idx * 1.27, 1.5, 0.6, ['F.Cu'], order[n]))
     u1 = footprint('U1', 24, 10, 0, soic)
-    return board(36, 20, [j1, u1])
+    return board(36, 20, [j1, u1], layers=layers)
 
 
 def with_pour() -> str:

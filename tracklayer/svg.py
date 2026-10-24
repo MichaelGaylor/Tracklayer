@@ -6,7 +6,8 @@ import math
 from .board import Board
 from .sexp import fmt
 
-LAYER_COLOURS = {'F.Cu': '#d8323c', 'B.Cu': '#3864d8', 'In1.Cu': '#c0a000', 'In2.Cu': '#20a060'}
+LAYER_COLOURS = {'F.Cu': '#d8323c', 'B.Cu': '#3864d8', 'In1.Cu': '#c8a000', 'In2.Cu': '#20a060',
+                 'In3.Cu': '#b040c0', 'In4.Cu': '#20b0c0', 'In5.Cu': '#e07020', 'In6.Cu': '#80a040'}
 
 
 def _colour(layer: str) -> str:

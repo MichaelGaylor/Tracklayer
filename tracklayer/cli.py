@@ -19,7 +19,10 @@ def main(argv=None) -> int:
     ap.add_argument('-o', '--output', help='routed board to write (default: <board>-routed.kicad_pcb)')
     ap.add_argument('--in-place', action='store_true', help='write the routes into the input file')
     ap.add_argument('--pro', help='.kicad_pro for net classes (default: next to the board)')
-    ap.add_argument('--pitch', type=float, default=0.2, help='grid pitch in mm (default 0.2)')
+    ap.add_argument('--engine', choices=['shape', 'grid'], default='shape',
+                    help='shape: exact geometry, any angle (default); grid: raster A*, 45-degree tracks')
+    ap.add_argument('--pitch', type=float, default=0.2, help='grid engine: grid pitch in mm (default 0.2)')
+    ap.add_argument('--via-pitch', type=float, default=0.25, help='shape engine: lattice of via positions (default 0.25)')
     ap.add_argument('--layers', help='copper layers to use, comma separated (default: all)')
     ap.add_argument('--nets', nargs='*', default=None, help='only route nets matching these patterns (fnmatch)')
     ap.add_argument('--exclude', nargs='*', default=[], help='never route nets matching these patterns')
@@ -62,7 +65,7 @@ def main(argv=None) -> int:
         doomed = [t for t in b.tracks if t.net in nets and not t.locked] + [v for v in b.vias if v.net in nets and not v.locked]
         b.tracks = [t for t in b.tracks if not (t.net in nets and not t.locked)]
         b.vias = [v for v in b.vias if not (v.net in nets and not v.locked)]
-    opts = Options(pitch=a.pitch, layers=a.layers.split(',') if a.layers else None, passes=a.passes,
+    opts = Options(engine=a.engine, via_pitch=a.via_pitch, pitch=a.pitch, layers=a.layers.split(',') if a.layers else None, passes=a.passes,
                    via_cost=a.via_cost, bend_cost=a.bend_cost, zone_cost=a.zone_cost, zone_cost_local=a.zone_cost_local, angles=a.angles,
                    route_zone_nets=not a.no_zone_nets, via_in_pad=a.via_in_pad, margin=a.margin,
                    pour_obstacle_frac=a.pour_obstacle, pour_depth=a.pour_depth,
@@ -72,7 +75,11 @@ def main(argv=None) -> int:
         return 1
     print(f'{os.path.basename(a.board)}: {len(b.pads)} pads, {len(nets)} nets to route, '
           f'{len(b.tracks)} existing tracks, {len(b.zones)} zones, layers {", ".join(opts.layers or b.copper_layers)}')
-    r = Router(b, nets, opts)
+    if opts.engine == 'shape':
+        from .shape_router import ShapeRouter
+        r = ShapeRouter(b, nets, opts)
+    else:
+        r = Router(b, nets, opts)
     r.run()
     out = a.board if a.in_place else (a.output or os.path.splitext(a.board)[0] + '-routed.kicad_pcb')
     write_board(b, r.routes, doomed, out)

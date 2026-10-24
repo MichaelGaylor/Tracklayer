@@ -7,6 +7,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from tracklayer.board import load
 from tracklayer.router import Options, Router, _seg_dist
+from tracklayer.shape_router import ShapeRouter
 from tracklayer.smooth import smooth_polyline
 from tracklayer.writer import write_board
 
@@ -44,16 +45,13 @@ def _clearance_ok(board, routes, clearance=0.2):
 
 
 def _seg_rect_dist(x1, y1, x2, y2, p):
-    """Distance from a segment to a (possibly rotated) rectangular pad's outline."""
-    a = math.radians(p.rot)
-    c, s = math.cos(a), math.sin(a)
-    corners = []
-    for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
-        lx, ly = sx * p.w / 2, sy * p.h / 2
-        corners.append((p.x + lx * c + ly * s, p.y - lx * s + ly * c))
+    """Distance from a segment to a pad outline (rounded corners included, polygon slightly outside)."""
+    from tracklayer.shapes import rrect_polygon
+    poly = rrect_polygon(p.x, p.y, p.w, p.h, p.rot, p.corner_radius(), 0.0)
     best = math.inf
-    for k in range(4):
-        (ax, ay), (bx, by) = corners[k], corners[(k + 1) % 4]
+    n = len(poly)
+    for k in range(n):
+        (ax, ay), (bx, by) = poly[k], poly[(k + 1) % n]
         best = min(best, _seg_dist(x1, y1, x2, y2, ax, ay, bx, by))
     return best
 
@@ -156,3 +154,71 @@ def test_smoothing_45():
     assert out == [(0, 0), (0.4, 0.4), (1.0, 0.4)]
     out = smooth_polyline(pts, lambda *a: True, 'any', 0.2)
     assert out[0] == (0, 0) and out[-1] == (1.0, 0.4) and len(out) == 2
+
+
+# ---------------------------------------------------------------- shape engine
+
+def test_shape_crossing_nets():
+    b = _load(two_resistors())
+    r = ShapeRouter(b, _nets(b), Options(verbose=False))
+    r.run()
+    assert not r.unrouted
+    _clearance_ok(b, r.routes)
+    assert sum(rt.length for rt in r.routes.values()) < 40
+
+
+def test_shape_eight_scrambled_nets():
+    b = _load(header_and_chip())
+    r = ShapeRouter(b, _nets(b), Options(verbose=False))
+    r.run()
+    assert not r.unrouted, [b.net_name(n) for n in r.unrouted]
+    _clearance_ok(b, r.routes)
+
+
+def test_shape_exact_clearance_is_tight():
+    """The shape engine gets within a few hundredths of the clearance; the grid engine cannot."""
+    b = _load(header_and_chip())
+    r = ShapeRouter(b, _nets(b), Options(verbose=False))
+    r.run()
+    best = math.inf
+    for rt in r.routes.values():
+        for layer, x1, y1, x2, y2, w in rt.segments:
+            for p in b.pads:
+                if p.net == rt.net or layer not in p.layers:
+                    continue
+                if p.shape == 'circle':
+                    d = _seg_dist(x1, y1, x2, y2, p.x, p.y, p.x, p.y) - p.w / 2 - w / 2
+                else:
+                    d = _seg_rect_dist(x1, y1, x2, y2, p) - w / 2
+                best = min(best, d)
+    assert 0.2 - 1e-6 <= best < 0.25
+
+
+def test_shape_pour_net():
+    b = _load(with_pour())
+    r = ShapeRouter(b, _nets(b), Options(verbose=False))
+    r.run()
+    assert not r.unrouted
+    g = r.routes[b.net_code('GND')]
+    assert len(g.vias) >= 1
+    for x, y in g.vias:
+        assert 2 < x < 34 and 2 < y < 18
+    _clearance_ok(b, r.routes)
+
+
+def test_six_layers_both_engines():
+    b = _load(header_and_chip(layers=6))
+    assert b.copper_layers == ['F.Cu', 'In1.Cu', 'In2.Cu', 'In3.Cu', 'In4.Cu', 'B.Cu']
+    for engine in (ShapeRouter, Router):
+        r = engine(b, _nets(b), Options(verbose=False))
+        r.run()
+        assert not r.unrouted
+        _clearance_ok(b, r.routes)
+        layers_used = {seg[0] for rt in r.routes.values() for seg in rt.segments}
+        assert layers_used <= set(b.copper_layers)
+        for rt in r.routes.values():
+            assert rt.via_layers == ('F.Cu', 'B.Cu')
+    out = os.path.join(tempfile.mkdtemp(), 'six.kicad_pcb')
+    write_board(b, r.routes, None, out)
+    b2 = load(out)
+    assert len(b2.copper_layers) == 6 and len(b2.tracks) > 0

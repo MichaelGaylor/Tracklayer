@@ -64,6 +64,12 @@ class Options:
     via_drill: float | None = None
     max_expansions: int = 4_000_000
     verbose: bool = True
+    engine: str = 'shape'         # 'shape' (exact geometry) or 'grid'
+    via_pitch: float = 0.25       # shape engine: lattice of candidate via positions, mm
+    shape_corners: int = 160      # shape engine: nearest obstacle corners tried from each point
+    shape_vias: int = 40          # shape engine: nearest via spots tried from each point
+    shape_expansions: int = 6000  # shape engine: search budget per connection
+    shape_weight: float = 1.25    # shape engine: heuristic weight (>1 trades a little length for speed)
 
 
 @dataclass
