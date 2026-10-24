@@ -249,9 +249,6 @@ class ShapeRouter:
         tset = set(targets)
         via_cost = self.o.via_cost
         g = self.g
-        # legal via spots as point arrays (built once per search)
-        vj, vi = np.nonzero(via_ok)
-        vpx = g.x0 + vi * g.pitch; vpy = g.y0 + vj * g.pitch
 
         def key(l, x, y):
             return (l, round(x, 4), round(y, 4))
@@ -301,27 +298,49 @@ class ShapeRouter:
             # obstacle corners on this layer: not our own net's, and only tangent ones (the line from
             # here must leave both neighbouring edges on the same side, else the corner is no use)
             vx, vy, vp, vi_, pvx, pvy, nvx, nvy = verts[l]
-            if len(vx):
-                dx, dy = vx - x, vy - y
-                s1 = dx * (pvy - y) - dy * (pvx - x)
-                s2 = dx * (nvy - y) - dy * (nvx - x)
-                keep = (pnets[l][vp] != net) & (s1 * s2 >= 0)
+            near = obs[l].vertices_near(x, y, 3 * K_V)
+            if len(near):
+                vx_, vy_ = vx[near], vy[near]
+                dx, dy = vx_ - x, vy_ - y
+                s1 = dx * (pvy[near] - y) - dy * (pvx[near] - x)
+                s2 = dx * (nvy[near] - y) - dy * (nvx[near] - x)
+                keep = (pnets[l][vp[near]] != net) & (s1 * s2 >= 0)
                 dd = np.where(keep, np.hypot(dx, dy), np.inf)
-                sel = np.argsort(dd)[:K_V]
+                if len(dd) > K_V:
+                    sel = np.argpartition(dd, K_V)[:K_V]
+                else:
+                    sel = np.arange(len(dd))
                 sel = sel[np.isfinite(dd[sel])]
-                cx.append(vx[sel]); cy.append(vy[sel])
+                cx.append(vx_[sel]); cy.append(vy_[sel])
             n_plain = sum(len(a) for a in cx)
-            # via spots
-            if L > 1 and len(vpx):
-                dd = np.hypot(vpx - x, vpy - y)
-                sel = np.argsort(dd)[:K_VIA]
-                cx.append(vpx[sel]); cy.append(vpy[sel])
+            # via spots: the nearest legal lattice points, from a window that grows if it is empty
+            if L > 1:
+                for Rw in (2.0, 5.0, 12.0):
+                    j0, i0 = g.to_cell(x - Rw, y - Rw); j1, i1 = g.to_cell(x + Rw, y + Rw)
+                    j0, i0 = max(j0, 0), max(i0, 0); j1, i1 = min(j1 + 1, g.ny), min(i1 + 1, g.nx)
+                    if j1 <= j0 or i1 <= i0:
+                        continue
+                    jj, ii = np.nonzero(via_ok[j0:j1, i0:i1])
+                    if len(jj) >= K_VIA or Rw >= 12.0:
+                        break
+                if len(jj):
+                    px = g.x0 + (ii + i0) * g.pitch; py = g.y0 + (jj + j0) * g.pitch
+                    if len(px) > K_VIA:
+                        sel = np.argpartition(np.hypot(px - x, py - y), K_VIA)[:K_VIA]
+                        px, py = px[sel], py[sel]
+                    cx.append(px); cy.append(py)
             if not cx:
                 continue
             X = np.concatenate(cx); Y = np.concatenate(cy)
             same = (np.abs(X - x) < 1e-6) & (np.abs(Y - y) < 1e-6)
-            blocked = obs[l].blocked_many(x, y, X, Y, net) | same
             dist = np.hypot(X - x, Y - y)
+            # test in distance bands so near candidates are checked against few edges
+            blocked = np.zeros(len(X), dtype=bool)
+            order = np.argsort(dist)
+            for band in np.array_split(order, max(1, min(4, len(order) // 40))):
+                if len(band):
+                    blocked[band] = obs[l].blocked_many(x, y, X[band], Y[band], net)
+            blocked |= same
             for q in np.nonzero(~blocked)[0]:
                 qx, qy = float(X[q]), float(Y[q])
                 if q < n_plain:

@@ -131,6 +131,7 @@ class Obstacles:
         self.vidx: list[int] = []
         self.vprev: list[Pt] = []
         self.vnext: list[Pt] = []
+        self.vbuckets: dict[tuple[int, int], list[int]] = {}
         self._varr = None
 
     def add(self, pts: list[Pt], net: int) -> int:
@@ -168,8 +169,10 @@ class Obstacles:
             ox, oy = ox / lo * 0.002, oy / lo * 0.002
             if point_in_polygon(x + ox, y + oy, pts):
                 ox, oy = -ox, -oy
+            vid = len(self.vx)
             self.vx.append(x + ox); self.vy.append(y + oy); self.vpoly.append(pid); self.vidx.append(k)
             self.vprev.append((px, py)); self.vnext.append((nx_, ny_))
+            self.vbuckets.setdefault((int(math.floor((x + ox) / b)), int(math.floor((y + oy) / b))), []).append(vid)
         self._arr = None
         self._varr = None
         return pid
@@ -189,23 +192,50 @@ class Obstacles:
                           np.array(self.vidx, dtype=np.int64), pv[:, 0], pv[:, 1], nx[:, 0], nx[:, 1])
         return self._varr
 
-    def edges_near(self, x1: float, y1: float, x2: float, y2: float) -> list[int]:
+    def edges_near(self, x1: float, y1: float, x2: float, y2: float):
+        """Edge ids (numpy array, unique) in the buckets covering the bbox."""
         b = self.bucket
-        ids: set[int] = set()
+        parts = []
         for i in range(int(math.floor(min(x1, x2) / b)), int(math.floor(max(x1, x2) / b)) + 1):
             for j in range(int(math.floor(min(y1, y2) / b)), int(math.floor(max(y1, y2) / b)) + 1):
                 lst = self.buckets.get((i, j))
                 if lst:
-                    ids.update(lst)
-        return list(ids)
+                    parts.append(lst)
+        if not parts:
+            return np.zeros(0, dtype=np.int64)
+        if len(parts) == 1:
+            return np.array(parts[0], dtype=np.int64)
+        return np.unique(np.concatenate([np.array(p_, dtype=np.int64) for p_ in parts]))
+
+    def vertices_near(self, x: float, y: float, want: int, max_radius: float = 30.0) -> np.ndarray:
+        """Ids of the vertices in the bucket rings around (x, y), growing the ring until at least
+        `want` are gathered (or the radius runs out). Not sorted by distance."""
+        b = self.bucket
+        ci, cj = int(math.floor(x / b)), int(math.floor(y / b))
+        parts = []
+        count = 0
+        r = 0
+        while r * b <= max_radius:
+            for i in range(ci - r, ci + r + 1):
+                for j in range(cj - r, cj + r + 1):
+                    if max(abs(i - ci), abs(j - cj)) != r:
+                        continue
+                    lst = self.vbuckets.get((i, j))
+                    if lst:
+                        parts.append(lst); count += len(lst)
+            if count >= want:
+                break
+            r += 1
+        if not parts:
+            return np.zeros(0, dtype=np.int64)
+        return np.concatenate([np.array(p_, dtype=np.int64) for p_ in parts])
 
     def blocked(self, x1: float, y1: float, x2: float, y2: float, net: int, eps: float = 1e-7) -> bool:
         """Does the open segment cross into any polygon of another net?"""
-        ids = self.edges_near(x1, y1, x2, y2)
-        if not ids:
+        idx = self.edges_near(x1, y1, x2, y2)
+        if len(idx) == 0:
             return False
         ax, ay, bx, by, pid, enet = self._arrays()
-        idx = np.array(ids)
         m = enet[idx] != net
         if not m.any():
             return False
@@ -239,11 +269,10 @@ class Obstacles:
         out = np.zeros(K, dtype=bool)
         if K == 0:
             return out
-        ids = self.edges_near(min(x1, float(X2.min())), min(y1, float(Y2.min())), max(x1, float(X2.max())), max(y1, float(Y2.max())))
-        if not ids:
+        idx = self.edges_near(min(x1, float(X2.min())), min(y1, float(Y2.min())), max(x1, float(X2.max())), max(y1, float(Y2.max())))
+        if len(idx) == 0:
             return out
         ax, ay, bx, by, pid, enet = self._arrays()
-        idx = np.array(ids)
         idx = idx[enet[idx] != net]
         if len(idx) == 0:
             return out
