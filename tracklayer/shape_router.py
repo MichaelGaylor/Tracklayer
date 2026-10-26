@@ -94,6 +94,8 @@ class ShapeRouter:
                     obs[self.lidx[l]].add(circle_polygon(v.x, v.y, v.size / 2 + R), v.net if v.net > 0 else ALL)
         for z in b.zones:
             if z.is_keepout and z.keepout_tracks:
+                if z.keepout_classes is not None and c.netclass not in z.keepout_classes:
+                    continue
                 for l in z.layers:
                     if l in self.lidx:
                         for poly in polygon_grown(z.polygon, w / 2 + SLACK):

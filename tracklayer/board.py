@@ -6,6 +6,7 @@ degrees, counter-clockwise as seen on screen.
 from __future__ import annotations
 
 import fnmatch
+import re
 import json
 import math
 import os
@@ -76,6 +77,9 @@ class Via:
     span: tuple[int, int] | None = None
 
 
+_KEEPOUT_CLASSES = re.compile(r'keep-?out\s+class(?:es)?\s*:\s*([^;()]+)', re.IGNORECASE)
+
+
 @dataclass
 class Zone:
     net: int
@@ -85,6 +89,7 @@ class Zone:
     keepout_tracks: bool = False
     keepout_vias: bool = False
     is_keepout: bool = False
+    keepout_classes: list[str] | None = None   # rule area named 'keepout classes: A, B': only these net classes stay out
     filled: list[tuple[str, list[Pt]]] = field(default_factory=list)   # (layer, pts) fill as last saved by KiCad
 
 
@@ -355,6 +360,13 @@ def load(path: str, pro_path: str | None = None) -> Board:
                 z.is_keepout = True
                 z.keepout_tracks = ko.value('tracks') == 'not_allowed'
                 z.keepout_vias = ko.value('vias') == 'not_allowed'
+            m = _KEEPOUT_CLASSES.search(g.value('name', '') or '')
+            if m:
+                # class-selective rule area: tracks of the named classes keep out even when KiCad's own
+                # restriction is off (so a custom DRC rule can enforce the same classes in KiCad)
+                z.is_keepout = True
+                z.keepout_tracks = True
+                z.keepout_classes = [c for c in re.split(r'[,\s]+', m.group(1).strip()) if c]
             for fpoly in g.find_all('filled_polygon'):
                 fl = fpoly.value('layer', lay[0] if lay else 'F.Cu')
                 fp = _pts(fpoly)

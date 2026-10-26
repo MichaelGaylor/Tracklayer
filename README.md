@@ -35,6 +35,12 @@ as the board has. Blind and buried vias are not supported.
 
 * **Net classes are honoured.** Track width, clearance, via size and drill come from each net's
   class in the `.kicad_pro`. `--width`, `--clearance`, `--via`, `--drill` override them for a run.
+* **Rule areas can be class-selective.** Name a rule area `keepout classes: Default, Ground` and only
+  those net classes stay out of it, even with KiCad's own track restriction left off; the other
+  classes route through. Useful for keeping signals off the layer next to a switching pour while
+  the gate-drive nets that live there still reach their FETs. Pair it with a custom DRC rule
+  (`A.intersectsArea('name*') && A.NetClass == 'Default'`, constraint `disallow track`) so KiCad
+  checks the same thing.
 * **Existing copper is respected.** Pads, hand-routed tracks, vias, keep-out areas and copper
   graphics are obstacles with the right clearance. Tracks and vias already on a net count as
   part of it, so you can hand-route the critical nets first, lock them, and let Tracklayer do

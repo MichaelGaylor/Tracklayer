@@ -79,6 +79,7 @@ class RouteClass:
     clearance: float
     via_d: float
     via_drill: float
+    netclass: str = ''      # the KiCad net class, set when the board has class-selective rule areas
     tl: np.ndarray = None   # track owner, locked copper   [L, ny, nx] int16
     vl: np.ndarray = None   # via owner, locked copper
     tr: np.ndarray = None   # track owner, routed copper
@@ -183,17 +184,19 @@ class Router:
         self.class_of: dict[int, RouteClass] = {}
         self.neck_of: dict[int, RouteClass | None] = {}
         neck_w = self.o.neck_width or b.netclasses['Default'].track_width
+        selective = any(z.keepout_classes for z in self.b.zones)
         for n in self.nets:
             w, cl, vd, vdr = self.net_params(n)
-            key = (round(w, 4), round(cl, 4), round(vd, 4))
+            ncls = self.b.net_class_of.get(n, 'Default') if selective else ''
+            key = (round(w, 4), round(cl, 4), round(vd, 4), ncls)
             if key not in self.classes:
-                self.classes[key] = RouteClass(w, cl, vd, vdr)
+                self.classes[key] = RouteClass(w, cl, vd, vdr, ncls)
             self.class_of[n] = self.classes[key]
             # a narrower class to escape pads that the full width cannot leave cleanly
             if neck_w < w - 1e-6:
-                nkey = (round(neck_w, 4), round(cl, 4), round(vd, 4))
+                nkey = (round(neck_w, 4), round(cl, 4), round(vd, 4), ncls)
                 if nkey not in self.classes:
-                    self.classes[nkey] = RouteClass(neck_w, cl, vd, vdr)
+                    self.classes[nkey] = RouteClass(neck_w, cl, vd, vdr, ncls)
                 self.neck_of[n] = self.classes[nkey]
             else:
                 self.neck_of[n] = None
@@ -284,6 +287,8 @@ class Router:
         # keep-outs and copper graphics
         for z in b.zones:
             if not z.is_keepout:
+                continue
+            if z.keepout_classes is not None and c.netclass not in z.keepout_classes:
                 continue
             for l in z.layers:
                 if l not in self.lidx:
