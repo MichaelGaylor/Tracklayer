@@ -58,6 +58,21 @@
       "download_sha256": "ca4f8d5ed6d87919b0c6dd7b107f50e714cf3cdd509e475bca8c65b4c82705a5",
       "download_size": 45864,
       "install_size": 142918
+    },
+    {
+      "version": "0.2.2",
+      "status": "testing",
+      "runtime": "ipc",
+      "kicad_version": "9.0",
+      "platforms": [
+        "windows",
+        "macos",
+        "linux"
+      ],
+      "download_url": "https://github.com/MichaelGaylor/Tracklayer/releases/download/v0.2.2/tracklayer-pcm-0.2.2.zip",
+      "download_sha256": "fdf3be6d363fb25ed98a292c3b135275da6231815f61c4ac2236b1d2f1558cb2",
+      "download_size": 47329,
+      "install_size": 145904
     }
   ]
 }
