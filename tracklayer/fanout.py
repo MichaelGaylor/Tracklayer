@@ -28,6 +28,13 @@ def _extent(p: Pad, ux: float, uy: float) -> float:
     return (along * p.w + across * p.h) / 2
 
 
+def _seg_dist(px, py, x1, y1, x2, y2):
+    dx, dy = x2 - x1, y2 - y1
+    L2 = dx * dx + dy * dy
+    t = 0.0 if L2 == 0 else max(0.0, min(1.0, ((px - x1) * dx + (py - y1) * dy) / L2))
+    return math.hypot(px - (x1 + t * dx), py - (y1 + t * dy))
+
+
 def fanout(b: Board, nets: set[int], neck_width: float | None = None, stub_min: float = 0.5,
            layers: list[str] | None = None) -> dict[int, tuple[list, list]]:
     """Add escape stubs for the fine-pitch pads of the given nets. Returns {net: (segments, vias)} in the
@@ -76,36 +83,41 @@ def fanout(b: Board, nets: set[int], neck_width: float | None = None, stub_min: 
             pitch = vd + cl
             # stagger: alternate pins along the row take the near and the far position, then try further out
             base = edge + vd / 2 + cl
-            tries = [base + (k % 2) * pitch, base + ((k + 1) % 2) * pitch, base + 2 * pitch, base + 3 * pitch]
+            tries = [base + (k % 2) * pitch, base + ((k + 1) % 2) * pitch, base + 2 * pitch]
             k += 1
+            others = [q2 for q2 in b.pads if q2.net != p.net and math.hypot(q2.x - p.x, q2.y - p.y) < 12.0]
+
+            def clear(vx, vy, with_via):
+                # the via and the whole stub must clear every other net's pad (full extent) and every via so far
+                for q2 in others:
+                    half = math.hypot(q2.w, q2.h) / 2
+                    if with_via and math.hypot(q2.x - vx, q2.y - vy) < vd / 2 + half + cl:
+                        return False
+                    if _seg_dist(q2.x, q2.y, p.x, p.y, vx, vy) < neck / 2 + half + cl:
+                        return False
+                if with_via:
+                    for (ex, ey, es) in placed:
+                        if math.hypot(ex - vx, ey - vy) < (vd + es) / 2 + cl:
+                            return False
+                return True
+
             via_at = None
             for dist in tries:
                 vx, vy = p.x + ox * dist, p.y + oy * dist
                 if not (bx0 + vd < vx < bx1 - vd and by0 + vd < vy < by1 - vd):
                     continue
-                ok = True
-                for q2 in b.pads:
-                    if q2.net == p.net:
-                        continue
-                    need = vd / 2 + min(q2.w, q2.h) / 2 + cl
-                    if math.hypot(q2.x - vx, q2.y - vy) < need:
-                        ok = False
-                        break
-                if ok:
-                    for (ex, ey, es) in placed:
-                        if math.hypot(ex - vx, ey - vy) < (vd + es) / 2 + cl:
-                            ok = False
-                            break
+                ok = clear(vx, vy, True)
                 if ok:
                     via_at = (vx, vy, dist)
                     break
             segs, vias = out.setdefault(p.net, ([], []))
             if via_at is None:
-                # no room for a via: a bare stub still reserves the escape and gives the router a point to start from
+                # no room for a via: a short bare stub still reserves the escape, if even that is clear
                 dist = edge + stub_min
                 ex, ey = p.x + ox * dist, p.y + oy * dist
-                segs.append((layer, p.x, p.y, ex, ey, neck))
-                b.tracks.append(Track(p.x, p.y, ex, ey, neck, layer, p.net))
+                if clear(ex, ey, False):
+                    segs.append((layer, p.x, p.y, ex, ey, neck))
+                    b.tracks.append(Track(p.x, p.y, ex, ey, neck, layer, p.net))
                 continue
             vx, vy, dist = via_at
             segs.append((layer, p.x, p.y, vx, vy, neck))

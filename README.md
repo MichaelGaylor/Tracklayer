@@ -42,7 +42,8 @@ as the board has. Blind and buried vias are not supported.
   Nets with a fine-pitch pad are also routed at the neck width first, full width as the fallback.
 * **Rule areas can be class-selective.** Name a rule area `keepout classes: Default, Ground` and only
   those net classes stay out of it, even with KiCad's own track restriction left off; the other
-  classes route through. Useful for keeping signals off the layer next to a switching pour while
+  classes route through, and their vias stay out too (the net whose pour the area sits on may still
+  via into its own copper). Useful for keeping signals off the layer next to a switching pour while
   the gate-drive nets that live there still reach their FETs. Pair it with a custom DRC rule
   (`A.intersectsArea('name*') && A.NetClass == 'Default'`, constraint `disallow track`) so KiCad
   checks the same thing.

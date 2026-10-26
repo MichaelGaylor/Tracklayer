@@ -205,6 +205,20 @@ class Router:
         self.say(f'grid {self.NX}x{self.NY} cells x {L} layers at {self.o.pitch} mm, '
                  f'{len(self.classes)} route class(es), prepared in {time.time() - t0:.1f} s')
 
+    def _pour_owner(self, z, layer: str) -> int:
+        """The net of the pour a rule area sits on (same outline, or containing most of its vertices), else ALL."""
+        from .shapes import point_in_polygon
+        best, score = ALL, 0
+        for z2 in self.b.zones:
+            if z2.is_keepout or z2.net <= 0:
+                continue
+            if set(z2.polygon) == set(z.polygon):
+                return z2.net
+            n = sum(1 for (x, y) in z.polygon if point_in_polygon(x, y, z2.polygon))
+            if n > score and n * 2 > len(z.polygon):
+                best, score = z2.net, n
+        return best
+
     def _edge_masks(self, r: float) -> np.ndarray:
         """Cells closer than r to the board edge (or outside)."""
         g = self.g
@@ -294,6 +308,11 @@ class Router:
                 if l not in self.lidx:
                     continue
                 li = self.lidx[l]
+                if z.keepout_classes is not None:
+                    # a class-selective area keeps the listed classes' vias out as well, so a net cannot drop in and
+                    # leave on another layer; the net whose pour the area covers may still via into its own copper
+                    j0, i0, m = polygon_mask(g, z.polygon, c.via_d / 2 + mg)
+                    paint_owner(c.vl[li], j0, i0, m, self._pour_owner(z, l), ALL)
                 if z.keepout_tracks:
                     j0, i0, m = polygon_mask(g, z.polygon, c.width / 2 + mg)
                     paint_owner(c.tl[li], j0, i0, m, ALL, ALL)
