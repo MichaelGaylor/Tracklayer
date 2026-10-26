@@ -61,7 +61,8 @@ class ShapeRouter:
         return self.gr.net_params(net)
 
     def _ckey(self, c: RouteClass):
-        return (round(c.width, 4), round(c.clearance, 4), round(c.via_d, 4))
+        # the net class is part of the key: a Gate neck and a Default full class can share a geometry yet see different keep-outs
+        return (round(c.width, 4), round(c.clearance, 4), round(c.via_d, 4), c.netclass)
 
     # ------------------------------------------------------------------ obstacles
     def _class_obstacles(self, c: RouteClass) -> list[Obstacles]:
