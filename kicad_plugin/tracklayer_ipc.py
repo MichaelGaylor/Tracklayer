@@ -153,6 +153,11 @@ def run_routing(kicad, st: Settings, say):
     say(f'{len(b.pads)} pads, {len(nets)} nets to route, {len(b.tracks)} existing tracks kept'
         + (f', {removed} removed' if removed else ''))
     opts = st.options()
+    from tracklayer.fanout import fanout, merge
+    from tracklayer.router import NetRoute
+    fo = fanout(b, nets, opts.neck_width, layers=opts.layers)
+    if fo:
+        say(f'Fan-out: {sum(len(v[0]) for v in fo.values())} stubs, {sum(len(v[1]) for v in fo.values())} vias on fine-pitch pads')
     r = ShapeRouter(b, nets, opts) if opts.engine == 'shape' else Router(b, nets, opts)
     orig = r.say
 
@@ -161,6 +166,7 @@ def run_routing(kicad, st: Settings, say):
         say(' '.join(str(x) for x in a))
     r.say = _say
     r.run()
+    merge(r.routes, fo, b, NetRoute)
     n = apply_routes(board, b, r.routes)
     say(f'Added {n} items to the board as one commit (Undo removes them)')
     if st.refill:

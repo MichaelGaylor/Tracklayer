@@ -8,7 +8,8 @@ import time
 
 from . import __version__
 from .board import load, match_nets
-from .router import Options, Router
+from .fanout import fanout, merge
+from .router import NetRoute, Options, Router
 from .svg import write_svg
 from .writer import write_board
 
@@ -42,6 +43,7 @@ def main(argv=None) -> int:
     ap.add_argument('--via-in-pad', action='store_true', help='allow vias inside SMD pads of the same net')
     ap.add_argument('--replace', action='store_true', help='remove existing unlocked tracks of the routed nets first')
     ap.add_argument('--neck', type=float, help='width used to escape tight pads (default: the Default class width)')
+    ap.add_argument('--no-fanout', action='store_true', help='do not fan fine-pitch pads out to vias before routing')
     ap.add_argument('--width', type=float, help='track width for every routed net (overrides net classes)')
     ap.add_argument('--clearance', type=float, help='clearance for every routed net')
     ap.add_argument('--via', type=float, help='via diameter for every routed net')
@@ -82,12 +84,16 @@ def main(argv=None) -> int:
         return 1
     print(f'{os.path.basename(a.board)}: {len(b.pads)} pads, {len(nets)} nets to route, '
           f'{len(b.tracks)} existing tracks, {len(b.zones)} zones, layers {", ".join(opts.layers or b.copper_layers)}')
+    fo = {} if a.no_fanout else fanout(b, nets, a.neck, layers=opts.layers)
+    if fo and not a.quiet:
+        print(f'fan-out: {sum(len(v[0]) for v in fo.values())} stubs, {sum(len(v[1]) for v in fo.values())} vias on fine-pitch pads')
     if opts.engine == 'shape':
         from .shape_router import ShapeRouter
         r = ShapeRouter(b, nets, opts)
     else:
         r = Router(b, nets, opts)
     r.run()
+    merge(r.routes, fo, b, NetRoute)
     out = a.board if a.in_place else (a.output or os.path.splitext(a.board)[0] + '-routed.kicad_pcb')
     write_board(b, r.routes, doomed, out)
     print(f'wrote {out}')

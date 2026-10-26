@@ -35,6 +35,11 @@ as the board has. Blind and buried vias are not supported.
 
 * **Net classes are honoured.** Track width, clearance, via size and drill come from each net's
   class in the `.kicad_pro`. `--width`, `--clearance`, `--via`, `--drill` override them for a run.
+* **Fine-pitch parts are fanned out first.** Every SMD pad whose neighbour on the same footprint is
+  too close for the net's width plus two clearances gets a stub at the neck width straight out from
+  the pad, ending in a via, staggered along the row so the vias fit. The nets then route from the
+  vias, so a wide supply track can never wall in the pins beside it. `--no-fanout` turns it off.
+  Nets with a fine-pitch pad are also routed at the neck width first, full width as the fallback.
 * **Rule areas can be class-selective.** Name a rule area `keepout classes: Default, Ground` and only
   those net classes stay out of it, even with KiCad's own track restriction left off; the other
   classes route through. Useful for keeping signals off the layer next to a switching pour while

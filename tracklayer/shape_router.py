@@ -210,6 +210,25 @@ class ShapeRouter:
         w = np.where((own != FREE) & (own != net), zw[j, i], 0.0)
         return 1.0 + w.mean(axis=1)
 
+    def _fine_pitch(self, net: int, c: RouteClass) -> bool:
+        """True when a pad of the net has a neighbour pin on the same footprint too close for the class width
+        plus two clearances to pass between them (SOIC, SOT-23 and the like)."""
+        need = c.width + 2 * c.clearance
+        by_ref = {}
+        for q in self.b.pads:
+            by_ref.setdefault(q.ref, []).append(q)
+        for p in self.b.pads:
+            if p.net != net or not any(l in self.lidx for l in p.layers):
+                continue
+            hp = min(p.w, p.h) / 2
+            for q in by_ref.get(p.ref, ()):
+                if q is p or q.net == net:
+                    continue
+                gap = math.hypot(q.x - p.x, q.y - p.y) - hp - min(q.w, q.h) / 2
+                if gap < need:
+                    return True
+        return False
+
     # ------------------------------------------------------------------ search
     def _route_net(self, net: int) -> NetRoute:
         w, cl, vd, vdr = self.net_params(net)
@@ -224,6 +243,7 @@ class ShapeRouter:
         via_ok = self._via_ok(net, c)
         neck_cls = self.gr.neck_of.get(net)
         neck = None
+        tight = neck_cls is not None and self._fine_pitch(net, c)
         name = self.b.net_name(net)
         comps.sort(key=len, reverse=True)
         tree = set(comps[0])
@@ -233,13 +253,24 @@ class ShapeRouter:
             targets = {p for comp in others for p in comp}
             where = {(l, round(x, 4), round(y, 4)): i for i, comp in enumerate(others) for (l, x, y) in comp}
             use_obs, width = obs, w
-            path = self._astar(net, c, obs, via_ok, tree, targets)
-            if path is None and neck_cls is not None:
-                # the full width cannot leave or reach a pad cleanly: try the narrower escape width
+            if tight:
+                # a pad of this net has fine-pitch neighbours: route at the neck width first, so the wide track does not
+                # wall in the pins beside it, and fall back to the full width only if the neck finds no path
                 if neck is None:
                     neck = (self._class_obstacles(neck_cls), self._via_ok(net, neck_cls))
                 use_obs, width = neck[0], neck_cls.width
                 path = self._astar(net, neck_cls, neck[0], neck[1], tree, targets)
+                if path is None:
+                    use_obs, width = obs, w
+                    path = self._astar(net, c, obs, via_ok, tree, targets)
+            else:
+                path = self._astar(net, c, obs, via_ok, tree, targets)
+                if path is None and neck_cls is not None:
+                    # the full width cannot leave or reach a pad cleanly: try the narrower escape width
+                    if neck is None:
+                        neck = (self._class_obstacles(neck_cls), self._via_ok(net, neck_cls))
+                    use_obs, width = neck[0], neck_cls.width
+                    path = self._astar(net, neck_cls, neck[0], neck[1], tree, targets)
             if path is None:
                 what = sorted({labels.get((l,) + self.g.to_cell(x, y), '') for (l, x, y) in targets} - {''})[:6]
                 self.say(f'  {name}: no path for {len(others)} remaining connection(s) ({", ".join(what) or "copper"})')
