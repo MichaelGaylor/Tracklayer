@@ -152,5 +152,5 @@ The tests build tiny boards in KiCad's own text format and check clearances on t
 
 Tracklayer is made by [Tiggy Engineering](https://www.tiggyengineering.com), Mike Gaylor's
 workshop: CNC, electronics and the odd EDM tap burner. It is free and MIT licensed. If it saves
-you an evening, have a look at what we make and sell on the website, or [buy us a beer](https://www.tiggyengineering.com).
+you an evening, have a look at what we make and sell on the website, or [buy us a beer through GitHub Sponsors](https://github.com/sponsors/MichaelGaylor).
 Bug reports and boards it gets wrong are welcome in the issues.
