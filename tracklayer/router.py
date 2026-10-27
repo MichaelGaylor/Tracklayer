@@ -48,6 +48,7 @@ class Options:
     zone_cost: float = 0.3        # extra cost factor for running through another net's plane-sized pour
     zone_cost_local: float = 6.0  # ... and through a smaller pour, which a track would cut into islands
     zone_cost_class: dict | None = None   # {'Gate': 0.2}: nets of that class pay that fraction of the pour costs
+    zone_flow_cost: float = 0.1   # fraction of the pour cost a track pays for running along a pour's flow direction
     prox_cost: float = 0.25       # extra cost factor for hugging copper
     dir_pref: float = 0.15        # extra cost for going against the layer's preferred direction
     conflict_cost: float = 3.0    # cost factor per pass for sharing a cell in negotiation passes
@@ -158,6 +159,7 @@ class Router:
         board_area = max((bx1 - bx0) * (by1 - by0), 1e-9)
         self.zone_owner = np.full((L, self.NY, self.NX), FREE, dtype=np.int16)
         self.zone_w = np.zeros((L, self.NY, self.NX), dtype=np.float32)
+        self.zone_dir = np.zeros((L, self.NY, self.NX), dtype=np.int8)   # 0 any way, 1 current runs along x, 2 along y
         for z in b.zones:
             if z.is_keepout or z.net <= 0:
                 continue
@@ -170,6 +172,9 @@ class Router:
                     win = self.zone_w[self.lidx[l]][j0:j0 + m.shape[0], i0:i0 + m.shape[1]]
                     mm = m[:win.shape[0], :win.shape[1]]
                     win[mm] = np.maximum(win[mm], weight)
+                    if z.flow:
+                        wd = self.zone_dir[self.lidx[l]][j0:j0 + m.shape[0], i0:i0 + m.shape[1]]
+                        wd[mm] = 1 if z.flow == 'x' else 2
         # outline: inside mask (largest polygon is the board, the rest are cut-outs)
         self.inside = np.zeros((self.NY, self.NX), dtype=bool)
         polys = sorted(b.outline, key=lambda p: -abs(_area(p)))
@@ -480,7 +485,17 @@ class Router:
         hard = (c.tl != FREE) & (c.tl != net)
         hard |= c.edge_t[None, :, :]
         cost = c.prox.copy()
-        cost += self.class_factor(net) * self.zone_w * ((self.zone_owner != FREE) & (self.zone_owner != net))
+        zw = self.class_factor(net) * self.zone_w * ((self.zone_owner != FREE) & (self.zone_owner != net))
+        flow = None
+        if self.zone_dir.any():
+            # pours with a flow direction: the cost of a move depends on its axis (diagonal, y, x)
+            fp = self.o.zone_flow_cost
+            cost += zw * (self.zone_dir == 0)
+            zx = np.where(self.zone_dir == 1, fp * zw, np.where(self.zone_dir == 2, zw, 0.0)).astype(np.float32)
+            zy = np.where(self.zone_dir == 2, fp * zw, np.where(self.zone_dir == 1, zw, 0.0)).astype(np.float32)
+            flow = ((0.5 * (zx + zy)).ravel().tolist(), zy.ravel().tolist(), zx.ravel().tolist())
+        else:
+            cost += zw
         cost += self.o.history_cost * self.hist
         other = (c.tr != FREE) & (c.tr != net)
         if soft:
@@ -495,11 +510,11 @@ class Router:
         else:
             via_bad |= via_other
         return (bytearray(hard.astype(np.uint8).tobytes()), cost.ravel().tolist(),
-                bytearray((~via_bad).astype(np.uint8).tobytes()), via_pen.ravel().tolist(), hard | other)
+                bytearray((~via_bad).astype(np.uint8).tobytes()), via_pen.ravel().tolist(), hard | other, flow)
 
     # ------------------------------------------------------------------ A*
     def _astar(self, sources, target: bytearray, hard: bytearray, cost: list, via_ok: bytearray,
-               via_pen: list, boxes: list):
+               via_pen: list, boxes: list, flow=None):
         NX, LN, L, N = self.NX, self.LN, self.L, self.N
         pitch = self.o.pitch
         bend = self.o.bend_cost
@@ -571,7 +586,8 @@ class Router:
                 nb = cur + doff
                 if hard[nb] or closed[nb]:
                     continue
-                ng = gc + pitch * ln * lc[l] * (1.0 + cost[nb] + pl[axis]) + (bend if (pd != k and pd != 255) else 0.0)
+                ng = gc + pitch * ln * lc[l] * (1.0 + cost[nb] + pl[axis] + (flow[axis][nb] if flow is not None else 0.0)) \
+                    + (bend if (pd != k and pd != 255) else 0.0)
                 if ng < g[nb]:
                     g[nb] = ng
                     parent[nb] = cur
@@ -621,7 +637,7 @@ class Router:
         others = comps[1:]
         name = self.b.nets.get(net, str(net))
         while others:
-            hard, cost, via_ok, via_pen, strict = full
+            hard, cost, via_ok, via_pen, strict, flow = full
             width = w
             target = bytearray(self.N)
             boxes = []
@@ -634,14 +650,14 @@ class Router:
                     target[idx] = 1
                     where[idx] = k
             sources = [l * self.LN + j * self.NX + i for (l, j, i) in tree]
-            path, nexp = self._astar(sources, target, hard, cost, via_ok, via_pen, boxes)
+            path, nexp = self._astar(sources, target, hard, cost, via_ok, via_pen, boxes, flow)
             if path is None and neck_cls is not None:
                 # the full width cannot leave or reach a pad cleanly: try the narrower escape width
                 if neck is None:
                     neck = self._prepare(net, soft, pen, neck_cls)
-                hard, cost, via_ok, via_pen, strict = neck
+                hard, cost, via_ok, via_pen, strict, flow = neck
                 width = neck_cls.width
-                path, nexp2 = self._astar(sources, target, hard, cost, via_ok, via_pen, boxes)
+                path, nexp2 = self._astar(sources, target, hard, cost, via_ok, via_pen, boxes, flow)
                 nexp += nexp2
             if path is None:
                 what = sorted({self._labels.get(c, '') for comp in others for c in comp} - {''})[:6]

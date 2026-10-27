@@ -47,13 +47,13 @@ def test_class_selective_rule_area():
         assert sig not in r.routes or not r.routes[sig].complete, engine.__name__   # Default may not: the band spans the board
 
 
-def _board_with_strip():
+def _board_with_strip(name=''):
     """A signal has to cross a GND pour strip that spans the whole board height on F.Cu; the only way round is B.Cu."""
     smd = ('smd', 'rect', ['F.Cu'])
     l = footprint('R1', 4, 10, 0, [('1', *smd[:2], 0, 0, 1.0, 1.2, smd[2], 'SIG')])
     r = footprint('R2', 32, 10, 0, [('1', *smd[:2], 0, 0, 1.0, 1.2, smd[2], 'SIG')])
     g = footprint('C1', 18, 3, 0, [('1', *smd[:2], 0, 0, 1.0, 1.2, smd[2], 'GND')])
-    zone = ('\t(zone\n\t\t(net "GND")\n\t\t(layer "F.Cu")\n\t\t(priority 0)\n'
+    zone = ('\t(zone\n\t\t(net "GND")\n\t\t(layer "F.Cu")\n\t\t(priority 0)\n' + (f'\t\t(name "{name}")\n' if name else '') +
             '\t\t(polygon\n\t\t\t(pts\n\t\t\t\t(xy 14 0)\n\t\t\t\t(xy 22 0)\n\t\t\t\t(xy 22 20)\n\t\t\t\t(xy 14 20)\n\t\t\t)\n\t\t)\n\t)\n')
     text = board(36, 20, [l, r, g], zone)
     d = tempfile.mkdtemp()
@@ -76,3 +76,19 @@ def test_zone_cost_class_lets_a_class_run_through_pours():
         r.run()
         assert r.routes[sig].complete
         assert len(r.routes[sig].vias) == 0, f'{engine.__name__}: with the class factor 0 it crosses the strip on F.Cu'
+
+
+def test_pour_flow_direction():
+    """The signal runs along x. A strip whose current flows along x is cheap to follow (no vias); one whose current
+    flows along y would be cut, so the signal still goes round on B.Cu."""
+    for engine in (ShapeRouter, Router):
+        b = _board_with_strip('GND band flow x')
+        sig = next(c for c, n in b.nets.items() if n == 'SIG')
+        assert [z.flow for z in b.zones if not z.is_keepout] == ['x']
+        r = engine(b, {sig}, Options(verbose=False))
+        r.run()
+        assert r.routes[sig].complete and len(r.routes[sig].vias) == 0, engine.__name__
+        b = _board_with_strip('GND band flow y')
+        r = engine(b, {sig}, Options(verbose=False))
+        r.run()
+        assert r.routes[sig].complete and len(r.routes[sig].vias) >= 2, engine.__name__

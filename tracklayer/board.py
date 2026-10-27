@@ -78,6 +78,7 @@ class Via:
 
 
 _KEEPOUT_CLASSES = re.compile(r'keep-?out\s+class(?:es)?\s*:\s*([^;()]+)', re.IGNORECASE)
+_FLOW = re.compile(r'\bflow\s*[:=]?\s*([xy])\b', re.IGNORECASE)
 
 
 @dataclass
@@ -90,6 +91,7 @@ class Zone:
     keepout_vias: bool = False
     is_keepout: bool = False
     keepout_classes: list[str] | None = None   # rule area named 'keepout classes: A, B': only these net classes stay out
+    flow: str | None = None                    # pour named '... flow x' / 'flow y': the direction its current runs
     filled: list[tuple[str, list[Pt]]] = field(default_factory=list)   # (layer, pts) fill as last saved by KiCad
 
 
@@ -367,6 +369,11 @@ def load(path: str, pro_path: str | None = None) -> Board:
                 z.is_keepout = True
                 z.keepout_tracks = True
                 z.keepout_classes = [c for c in re.split(r'[,\s]+', m.group(1).strip()) if c]
+            m = _FLOW.search(g.value('name', '') or '')
+            if m:
+                # a power pour that carries its current one way: tracks of other nets along it cost little,
+                # tracks across it would cut it and pay the full pour cost
+                z.flow = m.group(1).lower()
             for fpoly in g.find_all('filled_polygon'):
                 fl = fpoly.value('layer', lay[0] if lay else 'F.Cu')
                 fp = _pts(fpoly)

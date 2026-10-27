@@ -39,8 +39,11 @@ as the board has. Blind and buried vias are not supported.
   too close for the net's width plus two clearances gets a stub at the neck width straight out from
   the pad, ending in a via, staggered along the row so the vias fit. The nets then route from the
   vias, so a wide supply track can never wall in the pins beside it. `--no-fanout` turns it off.
-  A fine-pitch pad that has no fan-out (no room for the via) has its net routed at the neck width
-  first, full width as the fallback; everything else keeps its class width.
+  Every connection is routed at its class width; only one that cannot leave or reach a pad at that
+  width (a header pin, a pad the fan-out found no room for) drops to the neck width.
+* **Pours can say which way their current runs.** Name a power pour `PGND flow x` (or `flow y`) and a
+  track of another net pays a tenth of the pour cost for running along it and the full cost for cutting
+  across it (`--zone-flow-cost`). A gate drive can follow its switching cell's band instead of slicing it.
 * **Rule areas can be class-selective.** Name a rule area `keepout classes: Default, Ground` and only
   those net classes stay out of it, even with KiCad's own track restriction left off; the other
   classes route through, and their vias stay out too (the net whose pour the area sits on may still
@@ -103,6 +106,7 @@ anything critical first; the plugin keeps existing tracks and routes the rest.
 | `--bend-cost` | 0.3 mm | Price of a direction change. |
 | `--zone-cost` | 0.3 | Extra cost factor for crossing a plane-sized pour of another net (both engines). |
 | `--zone-cost-local` | 2.5 | The same for a small pour. |
+| `--zone-flow-cost` | 0.1 | What a track pays, as a fraction of the pour cost, for running along a pour named `flow x` / `flow y`. |
 | `--zone-cost-class Gate=0.2` | 1 | Scale the pour costs for one net class. Gate drives live inside a switching cell and have to run along its pours; at the full cost the search gives up before it finds the way through. Repeatable. |
 | `--layer-cost F.Cu=1.6` | 1 | Make a layer dearer: long runs move to the other layers, short pad escapes stay. Repeatable. |
 | `--nets A B*` | all | Route only nets matching the patterns. `--exclude` does the opposite. |
