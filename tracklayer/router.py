@@ -47,6 +47,7 @@ class Options:
     bend_cost: float = 0.3        # mm per direction change
     zone_cost: float = 0.3        # extra cost factor for running through another net's plane-sized pour
     zone_cost_local: float = 6.0  # ... and through a smaller pour, which a track would cut into islands
+    zone_cost_class: dict | None = None   # {'Gate': 0.2}: nets of that class pay that fraction of the pour costs
     prox_cost: float = 0.25       # extra cost factor for hugging copper
     dir_pref: float = 0.15        # extra cost for going against the layer's preferred direction
     conflict_cost: float = 3.0    # cost factor per pass for sharing a cell in negotiation passes
@@ -137,6 +138,12 @@ class Router:
         vd = self.o.via_diameter or nc.via_diameter
         vdr = self.o.via_drill or nc.via_drill
         return w, cl, vd, vdr
+
+    def class_factor(self, net: int) -> float:
+        """Scale on the pour-crossing cost for the net's class (1 unless the class is in zone_cost_class)."""
+        if not self.o.zone_cost_class:
+            return 1.0
+        return float(self.o.zone_cost_class.get(self.b.net_class_of.get(net, 'Default'), 1.0))
 
     def obstacle_clearance(self, net: int) -> float:
         if net < 0:
@@ -473,7 +480,7 @@ class Router:
         hard = (c.tl != FREE) & (c.tl != net)
         hard |= c.edge_t[None, :, :]
         cost = c.prox.copy()
-        cost += self.zone_w * ((self.zone_owner != FREE) & (self.zone_owner != net))
+        cost += self.class_factor(net) * self.zone_w * ((self.zone_owner != FREE) & (self.zone_owner != net))
         cost += self.o.history_cost * self.hist
         other = (c.tr != FREE) & (c.tr != net)
         if soft:

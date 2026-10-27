@@ -45,3 +45,34 @@ def test_class_selective_rule_area():
         r.run()
         assert pwr in r.routes and r.routes[pwr].complete, engine.__name__      # Power may cross the band
         assert sig not in r.routes or not r.routes[sig].complete, engine.__name__   # Default may not: the band spans the board
+
+
+def _board_with_strip():
+    """A signal has to cross a GND pour strip that spans the whole board height on F.Cu; the only way round is B.Cu."""
+    smd = ('smd', 'rect', ['F.Cu'])
+    l = footprint('R1', 4, 10, 0, [('1', *smd[:2], 0, 0, 1.0, 1.2, smd[2], 'SIG')])
+    r = footprint('R2', 32, 10, 0, [('1', *smd[:2], 0, 0, 1.0, 1.2, smd[2], 'SIG')])
+    g = footprint('C1', 18, 3, 0, [('1', *smd[:2], 0, 0, 1.0, 1.2, smd[2], 'GND')])
+    zone = ('\t(zone\n\t\t(net "GND")\n\t\t(layer "F.Cu")\n\t\t(priority 0)\n'
+            '\t\t(polygon\n\t\t\t(pts\n\t\t\t\t(xy 14 0)\n\t\t\t\t(xy 22 0)\n\t\t\t\t(xy 22 20)\n\t\t\t\t(xy 14 20)\n\t\t\t)\n\t\t)\n\t)\n')
+    text = board(36, 20, [l, r, g], zone)
+    d = tempfile.mkdtemp()
+    p = os.path.join(d, 't.kicad_pcb')
+    with open(p, 'w', encoding='utf-8') as f:
+        f.write(text)
+    return load(p)
+
+
+def test_zone_cost_class_lets_a_class_run_through_pours():
+    for engine in (ShapeRouter, Router):
+        b = _board_with_strip()
+        sig = next(c for c, n in b.nets.items() if n == 'SIG')
+        r = engine(b, {sig}, Options(verbose=False))
+        r.run()
+        assert r.routes[sig].complete
+        assert len(r.routes[sig].vias) >= 2, f'{engine.__name__}: the full pour cost sends the signal round on B.Cu'
+        b = _board_with_strip()
+        r = engine(b, {sig}, Options(verbose=False, zone_cost_class={'Default': 0.0}))
+        r.run()
+        assert r.routes[sig].complete
+        assert len(r.routes[sig].vias) == 0, f'{engine.__name__}: with the class factor 0 it crosses the strip on F.Cu'

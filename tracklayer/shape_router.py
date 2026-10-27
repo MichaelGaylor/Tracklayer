@@ -195,10 +195,14 @@ class ShapeRouter:
     # ------------------------------------------------------------------ pour crossing cost
     def _zone_factor(self, l: int, x: float, y: float, X: np.ndarray, Y: np.ndarray, net: int) -> np.ndarray:
         """1 + the mean pour-crossing weight along each candidate segment (another net's pour
-        costs zone_cost per mm for a plane, zone_cost_local for a small pour), sampled every 0.5 mm."""
+        costs zone_cost per mm for a plane, zone_cost_local for a small pour), sampled every 0.5 mm. A net class
+        listed in zone_cost_class has its pour costs scaled by that factor."""
         g = self.gr.g
         zo, zw = self.gr.zone_owner[l], self.gr.zone_w[l]
         if not zw.any():
+            return np.ones(len(X))
+        f = self.gr.class_factor(net)
+        if f <= 0:
             return np.ones(len(X))
         n = 12
         t = (np.arange(n) + 0.5) / n
@@ -208,7 +212,7 @@ class ShapeRouter:
         j = np.clip(np.rint((sy - g.y0) / g.pitch).astype(np.int64), 0, g.ny - 1)
         own = zo[j, i]
         w = np.where((own != FREE) & (own != net), zw[j, i], 0.0)
-        return 1.0 + w.mean(axis=1)
+        return 1.0 + f * w.mean(axis=1)
 
     def _fine_pitch(self, net: int, c: RouteClass) -> bool:
         """True when a pad of the net has a neighbour pin on the same footprint too close for the class width
@@ -217,8 +221,17 @@ class ShapeRouter:
         by_ref = {}
         for q in self.b.pads:
             by_ref.setdefault(q.ref, []).append(q)
+        # a pad that already has a track on it (a fan-out stub, or a route laid by hand) is left alone: the net
+        # continues from there at its full width
+        stubbed = set()
+        for t in self.b.tracks:
+            if t.net == net:
+                stubbed.add((round(t.x1, 3), round(t.y1, 3)))
+                stubbed.add((round(t.x2, 3), round(t.y2, 3)))
         for p in self.b.pads:
             if p.net != net or not any(l in self.lidx for l in p.layers):
+                continue
+            if (round(p.x, 3), round(p.y, 3)) in stubbed:
                 continue
             hp = min(p.w, p.h) / 2
             for q in by_ref.get(p.ref, ()):

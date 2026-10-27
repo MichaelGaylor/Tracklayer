@@ -242,19 +242,24 @@ class Obstacles:
         idx = idx[m]
         ax, ay, bx, by = ax[idx], ay[idx], bx[idx], by[idx]
         dx, dy = x2 - x1, y2 - y1
-        o1 = dx * (ay - y1) - dy * (ax - x1)          # edge start relative to the segment line
-        o2 = dx * (by - y1) - dy * (bx - x1)
+        L2 = dx * dx + dy * dy
+        Ls = math.sqrt(L2) or 1.0
+        # signed distances (not raw cross products): a segment and a chord both well under a tenth of a millimetre
+        # must still count as crossing
+        o1 = (dx * (ay - y1) - dy * (ax - x1)) / Ls   # edge start relative to the segment line
+        o2 = (dx * (by - y1) - dy * (bx - x1)) / Ls
         ex, ey = bx - ax, by - ay
-        o3 = ex * (y1 - ay) - ey * (x1 - ax)          # segment start relative to the edge line
-        o4 = ex * (y2 - ay) - ey * (x2 - ax)
+        Le = np.hypot(ex, ey)
+        Le[Le < 1e-12] = 1.0
+        o3 = (ex * (y1 - ay) - ey * (x1 - ax)) / Le   # segment start relative to the edge line
+        o4 = (ex * (y2 - ay) - ey * (x2 - ax)) / Le
         proper = (o1 * o2 < -eps) & (o3 * o4 < -eps)
         if proper.any():
             return True
         # touching: an edge end lies on the segment away from its ends, or a segment end lies on an edge
-        L2 = dx * dx + dy * dy
         tol = 1e-4
         for ox, oy, oo in ((ax, ay, o1), (bx, by, o2)):
-            on_line = np.abs(oo) < eps * max(1.0, math.sqrt(L2))
+            on_line = np.abs(oo) < eps
             if on_line.any():
                 t = ((ox - x1) * dx + (oy - y1) * dy) / max(L2, 1e-18)
                 inner = on_line & (t > tol) & (t < 1 - tol) & (o3 * o4 <= 0)
@@ -280,25 +285,28 @@ class Obstacles:
         exmin, exmax = np.minimum(ax, bx), np.maximum(ax, bx)
         eymin, eymax = np.minimum(ay, by), np.maximum(ay, by)
         ex, ey = bx - ax, by - ay
-        o3 = ex * (y1 - ay) - ey * (x1 - ax)
+        Le = np.hypot(ex, ey)
+        Le[Le < 1e-12] = 1.0
+        o3 = (ex * (y1 - ay) - ey * (x1 - ax)) / Le
         tol = 1e-4
         chunk = max(1, int(2_000_000 // max(len(idx), 1)))
         for c0 in range(0, K, chunk):
             xs, ys = X2[c0:c0 + chunk], Y2[c0:c0 + chunk]
             dx, dy = xs - x1, ys - y1
+            L2 = dx * dx + dy * dy
+            L = np.sqrt(L2)
+            Ls = np.where(L < 1e-12, 1.0, L)
             # bbox pre-filter
             ov = ((np.minimum(x1, xs)[:, None] <= exmax[None, :]) & (np.maximum(x1, xs)[:, None] >= exmin[None, :]) &
                   (np.minimum(y1, ys)[:, None] <= eymax[None, :]) & (np.maximum(y1, ys)[:, None] >= eymin[None, :]))
-            o1 = dx[:, None] * (ay - y1)[None, :] - dy[:, None] * (ax - x1)[None, :]
-            o2 = dx[:, None] * (by - y1)[None, :] - dy[:, None] * (bx - x1)[None, :]
-            o4 = ex[None, :] * (ys[:, None] - ay[None, :]) - ey[None, :] * (xs[:, None] - ax[None, :])
+            o1 = (dx[:, None] * (ay - y1)[None, :] - dy[:, None] * (ax - x1)[None, :]) / Ls[:, None]
+            o2 = (dx[:, None] * (by - y1)[None, :] - dy[:, None] * (bx - x1)[None, :]) / Ls[:, None]
+            o4 = (ex[None, :] * (ys[:, None] - ay[None, :]) - ey[None, :] * (xs[:, None] - ax[None, :])) / Le[None, :]
             o34 = o3[None, :] * o4
             hit = ov & (o1 * o2 < -eps) & (o34 < -eps)
             # an edge end touching the segment away from its ends
-            L2 = dx * dx + dy * dy
-            L = np.sqrt(L2)
             for ox, oy, oo in ((ax, ay, o1), (bx, by, o2)):
-                on_line = ov & (np.abs(oo) < eps * np.maximum(1.0, L)[:, None])
+                on_line = ov & (np.abs(oo) < eps)
                 if on_line.any():
                     t = ((ox[None, :] - x1) * dx[:, None] + (oy[None, :] - y1) * dy[:, None]) / np.maximum(L2, 1e-18)[:, None]
                     hit |= on_line & (t > tol) & (t < 1 - tol) & (o34 <= 0)

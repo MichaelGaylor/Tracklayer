@@ -47,3 +47,17 @@ def test_fanned_out_soic_routes_complete():
         r = engine(b, nets, Options(verbose=False))
         r.run()
         assert all(r.routes[n].complete for n in nets), engine.__name__
+
+
+def test_fanned_out_net_keeps_its_class_width():
+    """The neck width is for the stub only: once a fine-pitch pad has its fan-out, the net routes at the class width."""
+    b = _load(_soic_board())
+    b.netclasses['Default'].track_width = 0.3
+    nets = _nets(b)
+    fanout(b, nets, 0.25)
+    r = ShapeRouter(b, nets, Options(verbose=False, neck_width=0.25))
+    r.run()
+    for n in nets:
+        assert r.routes[n].complete
+        widths = {round(s[5], 3) for s in r.routes[n].segments}
+        assert widths == {0.3}, widths
