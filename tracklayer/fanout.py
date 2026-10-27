@@ -28,6 +28,48 @@ def _extent(p: Pad, ux: float, uy: float) -> float:
     return (along * p.w + across * p.h) / 2
 
 
+def _seg_seg_cross(ax, ay, bx, by, cx, cy, dx, dy) -> bool:
+    def orient(px, py, qx, qy, rx, ry):
+        v = (qx - px) * (ry - py) - (qy - py) * (rx - px)
+        return (v > 1e-12) - (v < -1e-12)
+    o1, o2 = orient(ax, ay, bx, by, cx, cy), orient(ax, ay, bx, by, dx, dy)
+    o3, o4 = orient(cx, cy, dx, dy, ax, ay), orient(cx, cy, dx, dy, bx, by)
+    return o1 != o2 and o3 != o4
+
+
+def _pad_seg_dist(q: Pad, x1: float, y1: float, x2: float, y2: float) -> float:
+    """Distance from a segment to the pad's rectangle (0 when they touch), in the pad's own frame.
+    Both shapes are convex, so the distance is attained at a corner of one against the other."""
+    a = math.radians(-q.rot)
+    c, s = math.cos(a), math.sin(a)
+
+    def tf(x, y):
+        dx, dy = x - q.x, y - q.y
+        return dx * c - dy * s, dx * s + dy * c
+
+    (ax, ay), (bx, by) = tf(x1, y1), tf(x2, y2)
+    hw, hh = q.w / 2, q.h / 2
+    corners = [(-hw, -hh), (hw, -hh), (hw, hh), (-hw, hh)]
+    inside = lambda x, y: -hw <= x <= hw and -hh <= y <= hh
+    if inside(ax, ay) or inside(bx, by):
+        return 0.0
+    for i in range(4):
+        (cx, cy), (dx, dy) = corners[i], corners[(i + 1) % 4]
+        if _seg_seg_cross(ax, ay, bx, by, cx, cy, dx, dy):
+            return 0.0
+    best = min(_seg_dist(cx, cy, ax, ay, bx, by) for cx, cy in corners)
+    for px, py in ((ax, ay), (bx, by)):
+        ex = max(abs(px) - hw, 0.0)
+        ey = max(abs(py) - hh, 0.0)
+        best = min(best, math.hypot(ex, ey))
+    return best
+
+
+def _pad_point_dist(q: Pad, x: float, y: float) -> float:
+    """Distance from a point to the pad's rectangle (0 inside)."""
+    return _pad_seg_dist(q, x, y, x, y)
+
+
 def _seg_dist(px, py, x1, y1, x2, y2):
     dx, dy = x2 - x1, y2 - y1
     L2 = dx * dx + dy * dy
@@ -54,7 +96,7 @@ def fanout(b: Board, nets: set[int], neck_width: float | None = None, stub_min: 
         cy = sum(p.y for p in pads) / len(pads)
         # which pads are hemmed in, and by which neighbour
         order = sorted(pads, key=lambda p: (round(p.y, 3), round(p.x, 3)))
-        k = 0
+        kk: dict[tuple, int] = {}       # stagger index per escape direction: each pin row (column) alternates on its own
         for p in order:
             if p.through or p.net <= 0 or p.net not in nets or not any(l in routed for l in p.layers):
                 continue
@@ -81,19 +123,23 @@ def fanout(b: Board, nets: set[int], neck_width: float | None = None, stub_min: 
             layer = next(l for l in p.layers if l in routed)
             edge = _extent(p, ox, oy)
             pitch = vd + cl
-            # stagger: alternate pins along the row take the near and the far position, then try further out
+            # stagger: alternate pins along the row take the near and the far position, then try further out.
+            # The index runs per escape direction, so the two rows of a SOIC or SOT-23 alternate independently:
+            # counted across the whole part, three pins of one row could all land on the near slot and wall the
+            # middle one in.
+            dkey = (round(ox, 2), round(oy, 2))
+            k = kk.get(dkey, 0)
+            kk[dkey] = k + 1
             base = edge + vd / 2 + cl
             tries = [base + (k % 2) * pitch, base + ((k + 1) % 2) * pitch, base + 2 * pitch]
-            k += 1
             others = [q2 for q2 in b.pads if q2.net != p.net and math.hypot(q2.x - p.x, q2.y - p.y) < 12.0]
 
             def clear(vx, vy, with_via):
-                # the via and the whole stub must clear every other net's pad (full extent) and every via so far
+                # the via and the whole stub must clear every other net's pad (its real rectangle) and every via so far
                 for q2 in others:
-                    half = math.hypot(q2.w, q2.h) / 2
-                    if with_via and math.hypot(q2.x - vx, q2.y - vy) < vd / 2 + half + cl:
+                    if with_via and _pad_point_dist(q2, vx, vy) < vd / 2 + cl:
                         return False
-                    if _seg_dist(q2.x, q2.y, p.x, p.y, vx, vy) < neck / 2 + half + cl:
+                    if _pad_seg_dist(q2, p.x, p.y, vx, vy) < neck / 2 + cl:
                         return False
                 if with_via:
                     for (ex, ey, es) in placed:
