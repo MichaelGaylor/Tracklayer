@@ -77,6 +77,13 @@ def _seg_dist(px, py, x1, y1, x2, y2):
     return math.hypot(px - (x1 + t * dx), py - (y1 + t * dy))
 
 
+def _seg_seg_dist(a, b):
+    """Distance between two short segments: the least endpoint-to-segment distance (exact unless they cross)."""
+    ax1, ay1, ax2, ay2 = a
+    bx1, by1, bx2, by2 = b
+    return min(_seg_dist(ax1, ay1, *b), _seg_dist(ax2, ay2, *b), _seg_dist(bx1, by1, *a), _seg_dist(bx2, by2, *a))
+
+
 def fanout(b: Board, nets: set[int], neck_width: float | None = None, stub_min: float = 0.5,
            layers: list[str] | None = None) -> dict[int, tuple[list, list]]:
     """Add escape stubs for the fine-pitch pads of the given nets. Returns {net: (segments, vias)} in the
@@ -88,6 +95,7 @@ def fanout(b: Board, nets: set[int], neck_width: float | None = None, stub_min: 
         by_ref.setdefault(p.ref, []).append(p)
     bx0, by0, bx1, by1 = b.bbox()
     placed: list[tuple[float, float, float]] = [(v.x, v.y, v.size) for v in b.vias]   # x, y, size of every via
+    stubs: list[tuple[str, tuple, float, int, float]] = []   # layer, segment, width, net, clearance of every stub laid so far
     out: dict[int, tuple[list, list]] = {}
     for ref, pads in by_ref.items():
         if len(pads) < 2:
@@ -147,6 +155,15 @@ def fanout(b: Board, nets: set[int], neck_width: float | None = None, stub_min: 
                     for (ex, ey, es) in placed:
                         if math.hypot(ex - vx, ey - vy) < (vd + es) / 2 + cl:
                             return False
+                # ... and every stub laid before it, by the larger of the two nets' clearances
+                for (sl, sseg, sw, snet, scl) in stubs:
+                    if snet == p.net or sl != layer:
+                        continue
+                    cq = max(cl, scl)
+                    if _seg_seg_dist((p.x, p.y, vx, vy), sseg) < neck / 2 + sw / 2 + cq:
+                        return False
+                    if with_via and _seg_dist(vx, vy, *sseg) < vd / 2 + sw / 2 + cq:
+                        return False
                 return True
 
             via_at = None
@@ -166,6 +183,7 @@ def fanout(b: Board, nets: set[int], neck_width: float | None = None, stub_min: 
                 if clear(ex, ey, False):
                     segs.append((layer, p.x, p.y, ex, ey, neck))
                     b.tracks.append(Track(p.x, p.y, ex, ey, neck, layer, p.net))
+                    stubs.append((layer, (p.x, p.y, ex, ey), neck, p.net, cl))
                 continue
             vx, vy, dist = via_at
             segs.append((layer, p.x, p.y, vx, vy, neck))
@@ -173,6 +191,7 @@ def fanout(b: Board, nets: set[int], neck_width: float | None = None, stub_min: 
             b.tracks.append(Track(p.x, p.y, vx, vy, neck, layer, p.net))
             b.vias.append(Via(vx, vy, vd, vdr, p.net, list(b.copper_layers)))
             placed.append((vx, vy, vd))
+            stubs.append((layer, (p.x, p.y, vx, vy), neck, p.net, cl))
     return out
 
 
