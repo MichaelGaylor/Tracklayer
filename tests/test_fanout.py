@@ -69,7 +69,7 @@ def test_fanout_keeps_the_neighbours_clearance_class():
     from tracklayer.fanout import _pad_seg_dist, _pad_point_dist
     b = _load(_soic_board())
     b.netclasses['Default'].track_width = 0.3
-    b.netclasses['HV'] = NetClass('HV', clearance=0.5, track_width=1.0, via_diameter=1.2, via_drill=0.6)
+    b.netclasses['HV'] = NetClass('HV', clearance=0.8, track_width=1.0, via_diameter=1.2, via_drill=0.6)
     hv = {p.net for p in b.pads if p.ref == 'U1' and p.number in ('2', '6')}
     for n in hv:
         b.net_class_of[n] = 'HV'
@@ -78,7 +78,7 @@ def test_fanout_keeps_the_neighbours_clearance_class():
     for net, (segs, vias) in fo.items():
         for (layer, x1, y1, x2, y2, w) in segs:
             for q in hv_pads:
-                assert _pad_seg_dist(q, x1, y1, x2, y2) >= w / 2 + 0.5 - 1e-6, (net, q.number)
+                assert _pad_seg_dist(q, x1, y1, x2, y2) >= w / 2 + 0.8 - 1e-6, (net, q.number)
         for (vx, vy) in vias:
             for q in hv_pads:
-                assert _pad_point_dist(q, vx, vy) >= 0.8 / 2 + 0.5 - 1e-6, (net, q.number)
+                assert _pad_point_dist(q, vx, vy) >= 0.8 / 2 + 0.8 - 1e-6, (net, q.number)
