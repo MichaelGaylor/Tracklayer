@@ -61,3 +61,24 @@ def test_fanned_out_net_keeps_its_class_width():
         assert r.routes[n].complete
         widths = {round(s[5], 3) for s in r.routes[n].segments}
         assert widths == {0.3}, widths
+
+
+def test_fanout_keeps_the_neighbours_clearance_class():
+    """A stub next to a pad of a wider-clearance class keeps that class's clearance: KiCad's DRC takes the larger."""
+    from tracklayer.board import NetClass
+    from tracklayer.fanout import _pad_seg_dist, _pad_point_dist
+    b = _load(_soic_board())
+    b.netclasses['Default'].track_width = 0.3
+    b.netclasses['HV'] = NetClass('HV', clearance=0.5, track_width=1.0, via_diameter=1.2, via_drill=0.6)
+    hv = {p.net for p in b.pads if p.ref == 'U1' and p.number in ('2', '6')}
+    for n in hv:
+        b.net_class_of[n] = 'HV'
+    fo = fanout(b, _nets(b) - hv, 0.25)
+    hv_pads = [p for p in b.pads if p.net in hv]
+    for net, (segs, vias) in fo.items():
+        for (layer, x1, y1, x2, y2, w) in segs:
+            for q in hv_pads:
+                assert _pad_seg_dist(q, x1, y1, x2, y2) >= w / 2 + 0.5 - 1e-6, (net, q.number)
+        for (vx, vy) in vias:
+            for q in hv_pads:
+                assert _pad_point_dist(q, vx, vy) >= 0.8 / 2 + 0.5 - 1e-6, (net, q.number)

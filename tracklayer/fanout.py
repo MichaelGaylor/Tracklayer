@@ -135,11 +135,13 @@ def fanout(b: Board, nets: set[int], neck_width: float | None = None, stub_min: 
             others = [q2 for q2 in b.pads if q2.net != p.net and math.hypot(q2.x - p.x, q2.y - p.y) < 12.0]
 
             def clear(vx, vy, with_via):
-                # the via and the whole stub must clear every other net's pad (its real rectangle) and every via so far
+                # the via and the whole stub must clear every other net's pad (its real rectangle) and every via so far,
+                # by the larger of the two nets' clearances: KiCad's DRC takes the larger too
                 for q2 in others:
-                    if with_via and _pad_point_dist(q2, vx, vy) < vd / 2 + cl:
+                    cq = max(cl, b.clearance(q2.net)) if q2.net > 0 else cl
+                    if with_via and _pad_point_dist(q2, vx, vy) < vd / 2 + cq:
                         return False
-                    if _pad_seg_dist(q2, p.x, p.y, vx, vy) < neck / 2 + cl:
+                    if _pad_seg_dist(q2, p.x, p.y, vx, vy) < neck / 2 + cq:
                         return False
                 if with_via:
                     for (ex, ey, es) in placed:
