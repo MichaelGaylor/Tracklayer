@@ -82,3 +82,35 @@ def test_fanout_keeps_the_neighbours_clearance_class():
         for (vx, vy) in vias:
             for q in hv_pads:
                 assert _pad_point_dist(q, vx, vy) >= 0.8 / 2 + 0.8 - 1e-6, (net, q.number)
+
+
+def _soic_with_pin1_routed():
+    """The SOIC board with pin 1's net already routed by hand: a track off the pad on F.Cu."""
+    from tracklayer.board import Track
+    b = _load(_soic_board())
+    b.netclasses['Default'].track_width = 0.3
+    p1 = next(p for p in b.pads if p.ref == 'U1' and p.number == '1')
+    b.tracks.append(Track(p1.x, p1.y, p1.x - 3.0, p1.y, 0.25, 'F.Cu', p1.net))
+    return b, p1
+
+
+def test_fanout_leaves_a_pad_that_has_its_track():
+    """Routing a board that is mostly done must not fan out the pads that already have copper on them."""
+    b, p1 = _soic_with_pin1_routed()
+    fo = fanout(b, _nets(b), 0.25)
+    assert p1.net not in fo, 'pin 1 is routed already: no stub, no via'
+    assert len(fo) == 7
+
+
+def test_fanout_clears_existing_tracks_of_other_nets():
+    """A stub or via of the fan-out must keep the clearance from the tracks already on the board."""
+    from tracklayer.fanout import _seg_seg_dist, _seg_dist
+    b, p1 = _soic_with_pin1_routed()
+    hand = b.tracks[0]
+    fo = fanout(b, _nets(b), 0.25)
+    for net, (segs, vias) in fo.items():
+        for (layer, x1, y1, x2, y2, w) in segs:
+            if layer == hand.layer:
+                assert _seg_seg_dist((x1, y1, x2, y2), (hand.x1, hand.y1, hand.x2, hand.y2)) >= w / 2 + hand.width / 2 + 0.2 - 1e-6
+        for (vx, vy) in vias:
+            assert _seg_dist(vx, vy, hand.x1, hand.y1, hand.x2, hand.y2) >= 0.8 / 2 + hand.width / 2 + 0.2 - 1e-6

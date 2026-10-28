@@ -84,6 +84,17 @@ def _seg_seg_dist(a, b):
     return min(_seg_dist(ax1, ay1, *b), _seg_dist(ax2, ay2, *b), _seg_dist(bx1, by1, *a), _seg_dist(bx2, by2, *a))
 
 
+def _already_connected(p: Pad, tracks: list, vias: list) -> bool:
+    """True when a track end or a via of the pad's own net lies on the pad: it has its escape already."""
+    for t in tracks:
+        if t.net == p.net and t.layer in p.layers and (_pad_point_dist(p, t.x1, t.y1) <= 1e-3 or _pad_point_dist(p, t.x2, t.y2) <= 1e-3):
+            return True
+    for v in vias:
+        if v.net == p.net and _pad_point_dist(p, v.x, v.y) <= 1e-3:
+            return True
+    return False
+
+
 def fanout(b: Board, nets: set[int], neck_width: float | None = None, stub_min: float = 0.5,
            layers: list[str] | None = None) -> dict[int, tuple[list, list]]:
     """Add escape stubs for the fine-pitch pads of the given nets. Returns {net: (segments, vias)} in the
@@ -97,6 +108,8 @@ def fanout(b: Board, nets: set[int], neck_width: float | None = None, stub_min: 
     placed: list[tuple[float, float, float]] = [(v.x, v.y, v.size) for v in b.vias]   # x, y, size of every via
     stubs: list[tuple[str, tuple, float, int, float]] = []   # layer, segment, width, net, clearance of every stub laid so far
     out: dict[int, tuple[list, list]] = {}
+    existing = list(b.tracks)                                 # the copper already on the board, before any stub of ours
+    existing_vias = list(b.vias)
     for ref, pads in by_ref.items():
         if len(pads) < 2:
             continue
@@ -108,6 +121,8 @@ def fanout(b: Board, nets: set[int], neck_width: float | None = None, stub_min: 
         for p in order:
             if p.through or p.net <= 0 or p.net not in nets or not any(l in routed for l in p.layers):
                 continue
+            if _already_connected(p, existing, existing_vias):
+                continue                                           # a track or via of its net already sits on the pad
             nc = b.netclass(p.net)
             w, cl, vd, vdr = nc.track_width, nc.clearance, nc.via_diameter, nc.via_drill
             near = None
@@ -141,6 +156,8 @@ def fanout(b: Board, nets: set[int], neck_width: float | None = None, stub_min: 
             base = edge + vd / 2 + cl
             tries = [base + (k % 2) * pitch, base + ((k + 1) % 2) * pitch, base + 2 * pitch]
             others = [q2 for q2 in b.pads if q2.net != p.net and math.hypot(q2.x - p.x, q2.y - p.y) < 12.0]
+            near_tracks = [t for t in existing if t.net != p.net
+                           and _seg_dist(p.x, p.y, t.x1, t.y1, t.x2, t.y2) < 12.0]
 
             def clear(vx, vy, with_via):
                 # the via and the whole stub must clear every other net's pad (its real rectangle) and every via so far,
@@ -155,6 +172,13 @@ def fanout(b: Board, nets: set[int], neck_width: float | None = None, stub_min: 
                     for (ex, ey, es) in placed:
                         if math.hypot(ex - vx, ey - vy) < (vd + es) / 2 + cl:
                             return False
+                # ... and the tracks already on the board: the stub on its own layer, the via on every layer
+                for t in near_tracks:
+                    cq = max(cl, b.clearance(t.net)) if t.net > 0 else cl
+                    if t.layer == layer and _seg_seg_dist((p.x, p.y, vx, vy), (t.x1, t.y1, t.x2, t.y2)) < neck / 2 + t.width / 2 + cq:
+                        return False
+                    if with_via and _seg_dist(vx, vy, t.x1, t.y1, t.x2, t.y2) < vd / 2 + t.width / 2 + cq:
+                        return False
                 # ... and every stub laid before it, by the larger of the two nets' clearances
                 for (sl, sseg, sw, snet, scl) in stubs:
                     if snet == p.net or sl != layer:
