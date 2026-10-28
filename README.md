@@ -101,14 +101,14 @@ anything critical first; the plugin keeps existing tracks and routes the rest.
 | `--engine` | shape | `shape` or `grid`, see above. |
 | `--pitch` | 0.2 mm | Grid engine: grid pitch. Smaller is slower and finds narrower gaps. |
 | `--via-pitch` | 0.25 mm | Shape engine: spacing of the candidate via spots. |
-| `--passes` | 8 | Rip-up and reroute passes. |
-| `--via-cost` | 4 mm | How much track a via is worth. Raise it for fewer vias. |
-| `--bend-cost` | 0.3 mm | Price of a direction change. |
+| `--passes` | 8 | Retry passes: each one pulls up the tracks in the way of a failed net and tries again. |
+| `--via-cost` | 4 mm | What a via is worth in mm of track: the router only drops one when the alternative is that much longer. Raise it for fewer vias. |
+| `--bend-cost` | 0.3 mm | What a corner is worth in mm of track: the router goes that much further to save a corner. |
 | `--zone-cost` | 0.3 | Extra cost factor for crossing a plane-sized pour of another net (both engines). |
 | `--zone-cost-local` | 2.5 | The same for a small pour. |
 | `--zone-flow-cost` | 0.1 | What a track pays, as a fraction of the pour cost, for running along a pour named `flow x` / `flow y`. |
 | `--zone-cost-class Gate=0.2` | 1 | Scale the pour costs for one net class. Gate drives live inside a switching cell and have to run along its pours; at the full cost the search gives up before it finds the way through. Repeatable. |
-| `--layer-cost F.Cu=1.6` | 1 | Make a layer dearer: long runs move to the other layers, short pad escapes stay. Repeatable. |
+| `--layer-cost F.Cu=1.6` | 1 | A track on that layer counts as 1.6 times its length, so long runs move to the other layers while short hops to pads stay. Repeatable. |
 | `--nets A B*` | all | Route only nets matching the patterns. `--exclude` does the opposite. |
 | `--no-zone-nets` | | Do not route nets that have pours at all. |
 | `--pour-obstacle FRAC` | off | Pours covering less than FRAC of the board are hard obstacles for other nets. |
