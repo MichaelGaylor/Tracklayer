@@ -22,6 +22,7 @@ from kipy import KiCad                                   # noqa: E402
 from kipy.board_types import BoardLayer, Track, Via      # noqa: E402
 from kipy.geometry import Vector2                        # noqa: E402
 from kipy.util.units import from_mm, to_mm               # noqa: E402
+from kipy.proto.common.types.base_types_pb2 import DocumentType   # noqa: E402
 
 from tracklayer import __version__                       # noqa: E402
 from tracklayer.board import NetClass, load, match_nets  # noqa: E402
@@ -126,8 +127,30 @@ class Settings:
                        route_zone_nets=self.zone_nets, verbose=False)
 
 
+def crash_risk(kicad):
+    """KiCad 10.0.0 to 10.0.6 crash on the first board write a plugin makes while the Schematic Editor is open in the
+    same session: the write lands in the schematic editor's API handler and dereferences a null pointer (KiCad issue
+    24966, fixed in 10.0.7). Returns the message to show instead of routing, or None when it is safe to go on."""
+    try:
+        v = kicad.get_version()
+        if v.major != 10 or (v.minor, v.patch) >= (0, 7):
+            return None
+        docs = kicad.get_open_documents(DocumentType.DOCTYPE_SCHEMATIC)
+    except Exception:
+        return None
+    if not docs:
+        return None
+    return (f'Not routing: KiCad {v.full_version} crashes on the first board write from a plugin while the Schematic '
+            f'Editor is open (KiCad bug 24966, fixed in KiCad 10.0.7). Close the Schematic Editor and press Route '
+            f'again, or update KiCad.')
+
+
 def run_routing(kicad, st: Settings, say):
     """The whole job: fetch, route, push, refill. `say` gets log lines; returns the router."""
+    risk = crash_risk(kicad)
+    if risk:
+        say(risk)
+        return None
     say('Fetching the board from KiCad...')
     board, b = fetch_board(kicad)
     all_nets = {c for c in b.nets if c > 0}
