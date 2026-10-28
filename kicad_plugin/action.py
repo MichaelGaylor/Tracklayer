@@ -237,7 +237,12 @@ class TracklayerAction(pcbnew.ActionPlugin):
         self.name = 'Tracklayer autoroute (classic)'
         self.category = 'Routing'
         self.description = 'Route the unrouted nets of this board with Tracklayer'
-        self.show_toolbar_button = True
+        # On KiCad 9 and 10 the API plugin already has the toolbar button, so the classic one stays under
+        # Tools > External Plugins; on KiCad 8 it is the only plugin and gets the button.
+        try:
+            self.show_toolbar_button = int(pcbnew.GetMajorMinorVersion().split('.')[0]) < 9
+        except Exception:
+            self.show_toolbar_button = True
         self.icon_file_name = os.path.join(HERE, 'icon.png')
         self.dark_icon_file_name = self.icon_file_name
 
