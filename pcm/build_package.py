@@ -52,7 +52,7 @@ def metadata(download_url: str, sha: str, dl_size: int, inst_size: int) -> dict:
             'with through vias.\n\nTools > External Plugins > Tracklayer autoroute. Pure Python. Runs through the KiCad API: enable it '
             'once under Preferences > Plugins > Enable KiCad API.\n\n'
             'Made by Tiggy Engineering (www.tiggyengineering.com). Free and open source; if it saves you an '
-            'evening, have a look at what we make, or buy us a beer.'
+            'evening, have a look at what we make, or buy us a beer through GitHub Sponsors: github.com/sponsors/MichaelGaylor'
         ),
         'identifier': IDENT,
         'type': 'plugin',
@@ -61,6 +61,7 @@ def metadata(download_url: str, sha: str, dl_size: int, inst_size: int) -> dict:
         'license': 'MIT',
         'resources': {'homepage': 'https://github.com/MichaelGaylor/Tracklayer',
                       'Issues': 'https://github.com/MichaelGaylor/Tracklayer/issues',
+                      'Sponsor': 'https://github.com/sponsors/MichaelGaylor',
                       'Tiggy Engineering': SITE},
         'tags': ['routing', 'autorouter', 'pcb'],
         'versions': [{

@@ -181,7 +181,7 @@ def run_routing(kicad, st: Settings, say):
 def connect(say):
     try:
         kicad = KiCad()
-        say(f'Tracklayer {__version__} by Tiggy Engineering  -  {SITE}')
+        say(f'Tracklayer {__version__} by Tiggy Engineering  -  {SITE}  -  buy us a beer: github.com/sponsors/MichaelGaylor')
         say(f'Connected to KiCad {kicad.get_version().full_version}')
         return kicad
     except Exception as e:
