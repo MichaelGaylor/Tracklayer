@@ -141,12 +141,17 @@ guessing.
 
 ## Limits, honestly
 
-This is a grid maze router, not a shape-based push-and-shove engine. It will route most
-two-layer hobby and small-production boards cleanly and quickly, and it leaves the hard nets
-for you to do by hand rather than guessing. It does not do differential pairs, length matching,
-blind or buried vias, or custom-shaped pads (these are treated as their bounding rectangle).
-It has been used on a 200 x 130 mm two-layer power board with 55 nets, which routes in about
-a minute and a half with zero DRC violations.
+The shape engine works on the real outlines of pads, tracks, vias and pours, at any angle, on
+any number of copper layers with through vias, so clearances come out exact and fine-pitch
+escapes are no harder than anything else. The grid engine is the older, faster, coarser one.
+Neither is push-and-shove: a net that cannot get through is retried after the tracks in its
+way are pulled up and rerouted, and a net that still cannot get through is reported by name
+and left for you rather than guessed at. It does not do differential pairs, length matching,
+blind or buried vias, or custom-shaped pads (those are treated as their bounding rectangle).
+It has been used on a 200 x 130 mm two-layer power board with 55 nets, which the grid engine
+routes in about a minute and a half with zero DRC violations, and on a 170 x 105 mm four-layer
+switching power board with 67 nets, 100 A copper, directional pours and class-selective
+keep-outs, which the shape engine routes in about half an hour, also with zero DRC violations.
 
 ## Development
 
