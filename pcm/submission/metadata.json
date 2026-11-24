@@ -1,78 +1,169 @@
 {
-  "$schema": "https://go.kicad.org/pcm/schemas/v2",
-  "name": "Tracklayer autorouter",
-  "description": "Autoroute the open board: exact-geometry (shape) or grid engine, any number of copper layers.",
-  "description_full": "Tracklayer routes the unrouted nets of the open board and adds the tracks and vias as one undoable change, then refills the zones. The shape engine works on exact geometry: every obstacle is grown by the clearance plus half the track width and tracks run corner to corner, so clearances are met exactly and tight escapes from fine-pitch pads just work. The grid engine gives classic 45-degree tracks. Net classes, locked and hand-routed copper, keep-outs and pours are respected. Any number of copper layers with through vias.\n\nTools > External Plugins > Tracklayer autoroute. Pure Python. Runs through the KiCad API: enable it once under Preferences > Plugins > Enable KiCad API.\n\nMade by Tiggy Engineering (www.tiggyengineering.com). Free and open source; if it saves you an evening, have a look at what we make, or buy us a beer.",
-  "identifier": "com.github.michaelgaylor.tracklayer",
-  "type": "plugin",
-  "author": {
-    "name": "Mike Gaylor, Tiggy Engineering",
-    "contact": {
-      "web": "https://www.tiggyengineering.com"
-    }
-  },
-  "maintainer": {
-    "name": "Mike Gaylor, Tiggy Engineering",
-    "contact": {
-      "web": "https://www.tiggyengineering.com"
-    }
-  },
-  "license": "MIT",
-  "resources": {
-    "homepage": "https://github.com/MichaelGaylor/Tracklayer",
-    "Issues": "https://github.com/MichaelGaylor/Tracklayer/issues",
-    "Tiggy Engineering": "https://www.tiggyengineering.com"
-  },
-  "tags": [
-    "routing",
-    "autorouter",
-    "pcb"
-  ],
-  "versions": [
-    {
-      "version": "0.1.0",
-      "status": "testing",
-      "kicad_version": "8.0",
-      "platforms": [
-        "windows",
-        "macos",
-        "linux"
-      ],
-      "download_url": "https://github.com/MichaelGaylor/Tracklayer/releases/download/v0.1.0/tracklayer-pcm-0.1.0.zip",
-      "download_sha256": "088934e73c9260ebca0692ee63246ed9e73951714a491864601432536f8da970",
-      "download_size": 43582,
-      "install_size": 134406,
-      "runtime": "swig"
+    "$schema": "https://go.kicad.org/pcm/schemas/v2",
+    "name": "Tracklayer autorouter",
+    "description": "Autoroute the open board: exact-geometry (shape) or grid engine, any number of copper layers.",
+    "description_full": "Tracklayer routes the unrouted nets of the open board and adds the tracks and vias as one undoable change, then refills the zones. The shape engine works on exact geometry: every obstacle is grown by the clearance plus half the track width and tracks run corner to corner, so clearances are met exactly and tight escapes from fine-pitch pads just work. The grid engine gives classic 45-degree tracks. Net classes, locked and hand-routed copper, keep-outs and pours are respected. Any number of copper layers with through vias.\n\nTools > External Plugins > Tracklayer autoroute. Pure Python. Runs through the KiCad API: enable it once under Preferences > Plugins > Enable KiCad API.\n\nMade by Tiggy Engineering (www.tiggyengineering.com). Free and open source; if it saves you an evening, have a look at what we make, or buy us a beer through GitHub Sponsors: github.com/sponsors/MichaelGaylor",
+    "identifier": "com.github.michaelgaylor.tracklayer",
+    "type": "plugin",
+    "author": {
+        "name": "Mike Gaylor, Tiggy Engineering",
+        "contact": {
+            "web": "https://www.tiggyengineering.com"
+        }
     },
-    {
-      "version": "0.2.1",
-      "status": "testing",
-      "runtime": "ipc",
-      "kicad_version": "9.0",
-      "platforms": [
-        "windows",
-        "macos",
-        "linux"
-      ],
-      "download_url": "https://github.com/MichaelGaylor/Tracklayer/releases/download/v0.2.1/tracklayer-pcm-0.2.1.zip",
-      "download_sha256": "ca4f8d5ed6d87919b0c6dd7b107f50e714cf3cdd509e475bca8c65b4c82705a5",
-      "download_size": 45864,
-      "install_size": 142918
+    "maintainer": {
+        "name": "Mike Gaylor, Tiggy Engineering",
+        "contact": {
+            "web": "https://www.tiggyengineering.com"
+        }
     },
-    {
-      "version": "0.2.2",
-      "status": "testing",
-      "runtime": "ipc",
-      "kicad_version": "9.0",
-      "platforms": [
-        "windows",
-        "macos",
-        "linux"
-      ],
-      "download_url": "https://github.com/MichaelGaylor/Tracklayer/releases/download/v0.2.2/tracklayer-pcm-0.2.2.zip",
-      "download_sha256": "fdf3be6d363fb25ed98a292c3b135275da6231815f61c4ac2236b1d2f1558cb2",
-      "download_size": 47329,
-      "install_size": 145904
-    }
-  ]
+    "license": "MIT",
+    "resources": {
+        "homepage": "https://github.com/MichaelGaylor/Tracklayer",
+        "Issues": "https://github.com/MichaelGaylor/Tracklayer/issues",
+        "Sponsor": "https://github.com/sponsors/MichaelGaylor",
+        "Tiggy Engineering": "https://www.tiggyengineering.com"
+    },
+    "tags": [
+        "routing",
+        "autorouter",
+        "pcb"
+    ],
+    "versions": [
+        {
+            "version": "0.1.0",
+            "status": "testing",
+            "kicad_version": "8.0",
+            "platforms": [
+                "windows",
+                "macos",
+                "linux"
+            ],
+            "download_url": "https://github.com/MichaelGaylor/Tracklayer/releases/download/v0.1.0/tracklayer-pcm-0.1.0.zip",
+            "download_sha256": "088934e73c9260ebca0692ee63246ed9e73951714a491864601432536f8da970",
+            "download_size": 43582,
+            "install_size": 134406,
+            "runtime": "swig"
+        },
+        {
+            "version": "0.2.1",
+            "status": "testing",
+            "runtime": "ipc",
+            "kicad_version": "9.0",
+            "platforms": [
+                "windows",
+                "macos",
+                "linux"
+            ],
+            "download_url": "https://github.com/MichaelGaylor/Tracklayer/releases/download/v0.2.1/tracklayer-pcm-0.2.1.zip",
+            "download_sha256": "ca4f8d5ed6d87919b0c6dd7b107f50e714cf3cdd509e475bca8c65b4c82705a5",
+            "download_size": 45864,
+            "install_size": 142918
+        },
+        {
+            "version": "0.2.2",
+            "status": "testing",
+            "runtime": "ipc",
+            "kicad_version": "9.0",
+            "platforms": [
+                "windows",
+                "macos",
+                "linux"
+            ],
+            "download_url": "https://github.com/MichaelGaylor/Tracklayer/releases/download/v0.2.2/tracklayer-pcm-0.2.2.zip",
+            "download_sha256": "fdf3be6d363fb25ed98a292c3b135275da6231815f61c4ac2236b1d2f1558cb2",
+            "download_size": 47329,
+            "install_size": 145904
+        },
+        {
+            "version": "0.2.3",
+            "status": "testing",
+            "runtime": "ipc",
+            "kicad_version": "9.0",
+            "platforms": [
+                "windows",
+                "macos",
+                "linux"
+            ],
+            "download_url": "https://github.com/MichaelGaylor/Tracklayer/releases/download/v0.2.3/tracklayer-pcm-0.2.3.zip",
+            "download_sha256": "cbb57c56f2d1f88a60b32d3ce952e5babee13bf2e314658f58ac8ffb71a5071c",
+            "download_size": 52332,
+            "install_size": 159960
+        },
+        {
+            "version": "0.2.4",
+            "status": "testing",
+            "runtime": "ipc",
+            "kicad_version": "9.0",
+            "platforms": [
+                "windows",
+                "macos",
+                "linux"
+            ],
+            "download_url": "https://github.com/MichaelGaylor/Tracklayer/releases/download/v0.2.4/tracklayer-pcm-0.2.4.zip",
+            "download_sha256": "c00f4eda556452d77419987335cbcc760586d004b4fef92f4dec56a74cb46c85",
+            "download_size": 52660,
+            "install_size": 161240
+        },
+        {
+            "version": "0.2.5",
+            "status": "testing",
+            "runtime": "ipc",
+            "kicad_version": "9.0",
+            "platforms": [
+                "windows",
+                "macos",
+                "linux"
+            ],
+            "download_url": "https://github.com/MichaelGaylor/Tracklayer/releases/download/v0.2.5/tracklayer-pcm-0.2.5.zip",
+            "download_sha256": "656edc51fc2b15304ead4e8bb4ce3e8d7c7166cbf332c40cb8ec358b2f4af3e4",
+            "download_size": 54102,
+            "install_size": 167211
+        },
+        {
+            "version": "0.2.6",
+            "status": "testing",
+            "runtime": "ipc",
+            "kicad_version": "9.0",
+            "platforms": [
+                "windows",
+                "macos",
+                "linux"
+            ],
+            "download_url": "https://github.com/MichaelGaylor/Tracklayer/releases/download/v0.2.6/tracklayer-pcm-0.2.6.zip",
+            "download_sha256": "2866c82b207b9a0a5e63f43148716afa4e41dae95c2e3a2ac80f9fc328287368",
+            "download_size": 54517,
+            "install_size": 168888
+        },
+        {
+            "version": "0.2.7",
+            "status": "testing",
+            "runtime": "ipc",
+            "kicad_version": "9.0",
+            "platforms": [
+                "windows",
+                "macos",
+                "linux"
+            ],
+            "download_url": "https://github.com/MichaelGaylor/Tracklayer/releases/download/v0.2.7/tracklayer-pcm-0.2.7.zip",
+            "download_sha256": "a512a4652586d053cc3fdad9f95dd40a6719da5fc264573fa73c64860a4b6440",
+            "download_size": 54915,
+            "install_size": 169970
+        },
+        {
+            "version": "0.2.8",
+            "status": "testing",
+            "runtime": "ipc",
+            "kicad_version": "9.0",
+            "platforms": [
+                "windows",
+                "macos",
+                "linux"
+            ],
+            "download_url": "https://github.com/MichaelGaylor/Tracklayer/releases/download/v0.2.8/tracklayer-pcm-0.2.8.zip",
+            "download_sha256": "92d94a390b6b854af7e9cfaaec6e0d928c25c4038c64aea720cd3c8de54d9bd3",
+            "download_size": 58474,
+            "install_size": 183025
+        }
+    ]
 }
