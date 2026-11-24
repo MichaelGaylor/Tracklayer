@@ -176,7 +176,7 @@ def run_routing(kicad, st: Settings, say):
     say(f'{len(b.pads)} pads, {len(nets)} nets to route, {len(b.tracks)} existing tracks kept'
         + (f', {removed} removed' if removed else ''))
     opts = st.options()
-    from tracklayer.fanout import fanout, merge
+    from tracklayer.fanout import fanout, merge, prune
     from tracklayer.router import NetRoute
     fo = fanout(b, nets, opts.neck_width, layers=opts.layers)
     if fo:
@@ -189,6 +189,9 @@ def run_routing(kicad, st: Settings, say):
         say(' '.join(str(x) for x in a))
     r.say = _say
     r.run()
+    gone = prune(r.routes, fo, b)
+    if any(gone):
+        say(f'Fan-out: {gone[0]} vias and {gone[1]} stubs and spurs the routing did not use taken back')
     merge(r.routes, fo, b, NetRoute)
     n = apply_routes(board, b, r.routes)
     say(f'Added {n} items to the board as one commit (Undo removes them)')

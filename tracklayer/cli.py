@@ -8,7 +8,7 @@ import time
 
 from . import __version__
 from .board import load, match_nets
-from .fanout import fanout, merge
+from .fanout import fanout, merge, prune
 from .router import NetRoute, Options, Router
 from .svg import write_svg
 from .writer import write_board
@@ -101,6 +101,9 @@ def main(argv=None) -> int:
     else:
         r = Router(b, nets, opts)
     r.run()
+    gone = prune(r.routes, fo, b)
+    if any(gone) and not a.quiet:
+        print(f'fan-out: {gone[0]} vias and {gone[1]} stubs and spurs the routing did not use taken back')
     merge(r.routes, fo, b, NetRoute)
     out = a.board if a.in_place else (a.output or os.path.splitext(a.board)[0] + '-routed.kicad_pcb')
     write_board(b, r.routes, doomed, out)

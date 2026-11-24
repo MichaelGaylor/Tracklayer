@@ -219,9 +219,273 @@ def fanout(b: Board, nets: set[int], neck_width: float | None = None, stub_min: 
     return out
 
 
+def _in_poly(x: float, y: float, pts: list) -> bool:
+    inside = False
+    n = len(pts)
+    for i in range(n):
+        (x1, y1), (x2, y2) = pts[i], pts[(i + 1) % n]
+        if (y1 > y) != (y2 > y) and x < x1 + (y - y1) * (x2 - x1) / (y2 - y1):
+            inside = not inside
+    return inside
+
+
+def _touch(a: tuple, b: tuple, strict: bool) -> bool:
+    """Do two items of one net connect? Items are ('p', pad), ('s', layer, x1, y1, x2, y2, w), ('v', x, y, size)
+    and ('z', zone). Strict is how KiCad joins them (a track end on the other item, a via centre on a pad);
+    loose is any overlap of their copper, which is what conducts on the finished board."""
+    eps = 1e-6
+    if a[0] > b[0]:
+        a, b = b, a
+    ka, kb = a[0], b[0]
+    if ka == 's' and kb == 's':
+        if a[1] != b[1]:
+            return False
+        sa, sb = a[2:6], b[2:6]
+        if strict:
+            return (_seg_dist(a[2], a[3], *sb) <= b[6] / 2 + eps or _seg_dist(a[4], a[5], *sb) <= b[6] / 2 + eps
+                    or _seg_dist(b[2], b[3], *sa) <= a[6] / 2 + eps or _seg_dist(b[4], b[5], *sa) <= a[6] / 2 + eps)
+        return _seg_seg_cross(*sa, *sb) or _seg_seg_dist(sa, sb) < (a[6] + b[6]) / 2 - eps
+    if ka == 's' and kb == 'v':
+        if strict:
+            return min(math.hypot(a[2] - b[1], a[3] - b[2]), math.hypot(a[4] - b[1], a[5] - b[2])) <= b[3] / 2 + eps
+        return _seg_dist(b[1], b[2], *a[2:6]) < b[3] / 2 + a[6] / 2 - eps
+    if ka == 'p' and kb == 's':
+        if b[1] not in a[1].layers:
+            return False
+        if strict:
+            return _pad_point_dist(a[1], b[2], b[3]) <= 1e-3 or _pad_point_dist(a[1], b[4], b[5]) <= 1e-3
+        return _pad_seg_dist(a[1], *b[2:6]) < b[6] / 2 - eps
+    if ka == 'p' and kb == 'v':
+        return _pad_point_dist(a[1], b[1], b[2]) < (1e-3 if strict else b[3] / 2 - eps)
+    if ka == 'v' and kb == 'v':
+        d = math.hypot(a[1] - b[1], a[2] - b[2])
+        return d <= max(a[3], b[3]) / 2 + eps if strict else d < (a[3] + b[3]) / 2 - eps
+    if ka == 'v' and kb == 'z':
+        return _in_poly(a[1], a[2], b[1].polygon)
+    if ka == 'p' and kb == 'z':
+        return a[1].through and _in_poly(a[1].x, a[1].y, b[1].polygon)
+    if ka == 'p' and kb == 'p':
+        # two pads of one footprint laid over each other (an SMD pad with a plated hole in it)
+        return (any(l in b[1].layers for l in a[1].layers)
+                and (_pad_point_dist(a[1], b[1].x, b[1].y) <= 1e-3 or _pad_point_dist(b[1], a[1].x, a[1].y) <= 1e-3))
+    return False
+
+
+def _end_held(items: list, i: int, ex: float, ey: float, alive: set) -> bool:
+    """Is this end of segment i on something of its net: a pad, a via, another track, a pour on its layer?"""
+    eps = 1e-6
+    layer, w = items[i][1], items[i][6]
+    for j in alive:
+        if j == i:
+            continue
+        it = items[j]
+        if it[0] == 'p':
+            if layer in it[1].layers and _pad_point_dist(it[1], ex, ey) <= 1e-3:
+                return True
+        elif it[0] == 'v':
+            if math.hypot(ex - it[1], ey - it[2]) <= it[3] / 2 + eps:
+                return True
+        elif it[0] == 'z':
+            if layer in it[1].layers and _in_poly(ex, ey, it[1].polygon):
+                return True
+        elif it[1] == layer:
+            if _seg_dist(ex, ey, *it[2:6]) <= it[6] / 2 + eps:
+                return True
+            if min(math.hypot(ex - it[2], ey - it[3]), math.hypot(ex - it[4], ey - it[5])) <= w / 2 + eps:
+                return True
+    return False
+
+
+def _groups(adj: list, alive: set, anchors: set) -> frozenset:
+    """How the anchors (pads and pours) of a net fall into connected groups over the items still alive."""
+    seen: set[int] = set()
+    out = []
+    for a in sorted(anchors):
+        if a in seen:
+            continue
+        comp, stack = {a}, [a]
+        while stack:
+            for j in adj[stack.pop()]:
+                if j in alive and j not in comp:
+                    comp.add(j)
+                    stack.append(j)
+        seen |= comp
+        out.append(frozenset(comp & anchors))
+    return frozenset(out)
+
+
+def _bridge_clear(b: Board, routes: dict, fo: dict, net: int, layer: str, seg: tuple, w: float) -> bool:
+    """A short joining segment must keep its clearance from every other net's pads, tracks and vias."""
+    cl = b.clearance(net)
+    for q in b.pads:
+        if q.net != net and layer in q.layers:
+            if _pad_seg_dist(q, *seg) < w / 2 + (max(cl, b.clearance(q.net)) if q.net > 0 else cl) - 1e-6:
+                return False
+    tracks = [(t.layer, t.x1, t.y1, t.x2, t.y2, t.width, t.net) for t in b.tracks if t.net != net]
+    vias = [(v.x, v.y, v.size, v.net) for v in b.vias if v.net != net]
+    for n, r in routes.items():
+        if n != net:
+            tracks += [(*s, n) for s in r.segments]
+            vias += [(x, y, r.params[2], n) for (x, y) in r.vias]
+    for n, (segs, vs) in fo.items():
+        if n != net:
+            tracks += [(*s, n) for s in segs]
+    for (l, x1, y1, x2, y2, tw, n) in tracks:
+        if l == layer:
+            c = max(cl, b.clearance(n)) if n > 0 else cl
+            if _seg_seg_cross(*seg, x1, y1, x2, y2) or _seg_seg_dist(seg, (x1, y1, x2, y2)) < w / 2 + tw / 2 + c - 1e-6:
+                return False
+    for (x, y, d, n) in vias:
+        c = max(cl, b.clearance(n)) if n > 0 else cl
+        if _seg_dist(x, y, *seg) < w / 2 + d / 2 + c - 1e-6:
+            return False
+    return True
+
+
+def prune(routes: dict, fo: dict[int, tuple[list, list]], b: Board) -> tuple[int, int]:
+    """Take back the fan-out copper the routing did not use. Returns (vias, stubs) removed.
+
+    The fan-out gives every hemmed-in pad a stub and a via before anything is routed, and the router then
+    uses each one as it sees fit: it changes layer at the via, or carries on from it on the same layer, or
+    leaves the pad some other way. What it did not need is left as a hole in the board, or a spur with a
+    hole on the end.
+
+    For each stub of a net that routed completely, in this order:
+
+    1. take the stub and its via out. If every pad and pour of the net is still joined as before, they go;
+    2. else take only the via out, and it goes if the net still holds together;
+    3. else a track on the stub's layer reaches the stub only through the via's copper. The via is replaced
+       by a short segment from the stub's end to that track, if it keeps its clearances;
+    4. else the via stays: it is doing a job.
+
+    "Joined as before" is measured by copper overlap, and "still holds together" by how KiCad joins items
+    (a track end on the other item), so nothing is removed that would leave an unconnected end behind.
+    A net left incomplete keeps all of it: the escape is where the missing track will be drawn from.
+    """
+    gone_vias = gone_stubs = 0
+    for net, (segs, vias) in fo.items():
+        r = routes.get(net)
+        if r is None or not r.complete or not segs:
+            continue
+        items: list[tuple] = [('p', p) for p in b.pads if p.net == net]
+        items += [('z', z) for z in b.zones if z.net == net and not z.is_keepout]
+        anchors = set(range(len(items)))
+        at: dict[tuple, int] = {}
+        for s in list(segs) + list(r.segments) + [(t.layer, t.x1, t.y1, t.x2, t.y2, t.width) for t in b.tracks if t.net == net]:
+            if ('s', *s[:5]) not in at:
+                at[('s', *s[:5])] = len(items)
+                items.append(('s', *s))
+        for (x, y, d) in [(v.x, v.y, v.size) for v in b.vias if v.net == net] + [(x, y, r.params[2]) for (x, y) in r.vias]:
+            if ('v', x, y) not in at:
+                at[('v', x, y)] = len(items)
+                items.append(('v', x, y, d))
+        n = len(items)
+        strict: list[set] = [set() for _ in range(n)]
+        loose: list[set] = [set() for _ in range(n)]
+        for i in range(n):
+            for j in range(i + 1, n):
+                if _touch(items[i], items[j], False):
+                    loose[i].add(j)
+                    loose[j].add(i)
+                    if _touch(items[i], items[j], True):
+                        strict[i].add(j)
+                        strict[j].add(i)
+        alive = set(range(n))
+        want = _groups(loose, alive, anchors)
+        keep_segs, drop_vias = [], set()
+        for stub in list(segs):
+            layer, x1, y1, x2, y2, w = stub
+            si = at[('s', *stub[:5])]
+            vi = at.get(('v', x2, y2)) if (x2, y2) in vias else None
+            gone = {si} if vi is None else {si, vi}
+            if _groups(strict, alive - gone, anchors) == want:
+                alive -= gone
+                gone_stubs += 1
+                if vi is not None:
+                    gone_vias += 1
+                    drop_vias.add((x2, y2))
+                continue
+            keep_segs.append(stub)
+            if vi is None:
+                continue
+            if _groups(strict, alive - {vi}, anchors) == want:
+                alive.discard(vi)
+                gone_vias += 1
+                drop_vias.add((x2, y2))
+                continue
+            # step 3: join the stub's end to the tracks that met it only inside the via
+            bridges = []
+            for j in sorted(loose[vi] & alive):
+                it = items[j]
+                if it[0] != 's' or it[1] != layer or j == si or j in strict[si]:
+                    continue
+                d, tx, ty = min((math.hypot(ex - x2, ey - y2), ex, ey) for ex, ey in ((it[2], it[3]), (it[4], it[5])))
+                if d > items[vi][3] / 2 + it[6] / 2:            # the track only passes: join it at its nearest point
+                    dx, dy = it[4] - it[2], it[5] - it[3]
+                    t = max(0.0, min(1.0, ((x2 - it[2]) * dx + (y2 - it[3]) * dy) / (dx * dx + dy * dy or 1.0)))
+                    tx, ty = it[2] + t * dx, it[3] + t * dy
+                if math.hypot(tx - x2, ty - y2) > 1e-6:
+                    bridges.append((layer, x2, y2, tx, ty, w))
+            if not bridges or not all(_bridge_clear(b, routes, fo, net, layer, br[1:5], w) for br in bridges):
+                continue
+            first = len(items)
+            for br in bridges:
+                it = ('s', *br)
+                links = {j for j in range(len(items)) if _touch(items[j], it, True)}
+                for j in links:
+                    strict[j].add(len(items))
+                items.append(it)
+                strict.append(links)
+                loose.append(set())
+            added = set(range(first, len(items)))
+            if _groups(strict, (alive - {vi}) | added, anchors) == want:
+                alive = (alive - {vi}) | added
+                keep_segs += bridges
+                gone_vias += 1
+                drop_vias.add((x2, y2))
+            else:                                               # no good: forget the bridges again
+                for j in added:
+                    for k in strict[j]:
+                        if k < first:
+                            strict[k].discard(j)
+                del items[first:], strict[first:], loose[first:]
+        if len(keep_segs) == len(segs) and not drop_vias:
+            continue
+        # a track the router ran to a via that is now gone is a spur: trim it back, end by end
+        routed = {at[('s', *s[:5])] for s in r.segments} - {at[('s', *s[:5])] for s in segs}
+        removed = set(range(n)) - alive
+        queue = [j for i in removed for j in loose[i] if j in routed]
+        trimmed: set[int] = set()
+        while queue:
+            i = queue.pop()
+            if i not in alive or i not in routed:
+                continue
+            it = items[i]
+            if _end_held(items, i, it[2], it[3], alive) and _end_held(items, i, it[4], it[5], alive):
+                continue
+            alive.discard(i)
+            trimmed.add(i)
+            queue += [j for j in loose[i] if j in routed and j in alive]
+        if trimmed and _groups(strict, alive, anchors) != want:
+            alive |= trimmed                                    # cannot happen for a true dead end; be safe
+            trimmed = set()
+        if trimmed:
+            cut = {items[i][1:6] for i in trimmed}
+            r.segments[:] = [s for s in r.segments if s[:5] not in cut]
+            gone_stubs += len(trimmed)
+        lost = {s[:5] for s in segs} - {s[:5] for s in keep_segs}
+        b.tracks[:] = [t for t in b.tracks if not (t.net == net and t.span is None and (t.layer, t.x1, t.y1, t.x2, t.y2) in lost)]
+        b.vias[:] = [v for v in b.vias if not (v.net == net and v.span is None and (v.x, v.y) in drop_vias)]
+        segs[:] = keep_segs
+        vias[:] = [v for v in vias if v not in drop_vias]
+    return gone_vias, gone_stubs
+
+
 def merge(routes: dict, fo: dict[int, tuple[list, list]], b: Board, make_route) -> None:
     """Put the fan-out copper into the routes dict so the writer emits it (also for nets left unrouted)."""
     for net, (segs, vias) in fo.items():
+        if not segs and not vias:
+            continue
         r = routes.get(net)
         if r is None:
             r = make_route(net)

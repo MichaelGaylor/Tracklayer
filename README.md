@@ -39,6 +39,10 @@ as the board has. Blind and buried vias are not supported.
   too close for the net's width plus two clearances gets a stub at the neck width straight out from
   the pad, ending in a via, staggered along the row so the vias fit. The nets then route from the
   vias, so a wide supply track can never wall in the pins beside it. `--no-fanout` turns it off.
+  After routing, the fan-out copper the router did not use is taken back: a via nothing reaches on
+  another layer, a stub the net left some other way, a spur that ran to a via now gone. Nothing is
+  removed unless every pad of the net is still joined afterwards, and a net left incomplete keeps its
+  escapes for hand routing.
   Every connection is routed at its class width; only one that cannot leave or reach a pad at that
   width (a header pin, a pad the fan-out found no room for) drops to the neck width.
 * **Pours can say which way their current runs.** Name a power pour `PGND flow x` (or `flow y`) and a

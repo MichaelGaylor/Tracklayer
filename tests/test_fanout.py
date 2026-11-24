@@ -114,3 +114,111 @@ def test_fanout_clears_existing_tracks_of_other_nets():
                 assert _seg_seg_dist((x1, y1, x2, y2), (hand.x1, hand.y1, hand.x2, hand.y2)) >= w / 2 + hand.width / 2 + 0.2 - 1e-6
         for (vx, vy) in vias:
             assert _seg_dist(vx, vy, hand.x1, hand.y1, hand.x2, hand.y2) >= 0.8 / 2 + hand.width / 2 + 0.2 - 1e-6
+
+
+def _one_stub():
+    """The SOIC board fanned out, and pin 1's stub and via picked out, with where the net's header pin is:
+    (board, fan-out, net, stub, via, header). The tests draw the rest of the net as one straight track to the header."""
+    b = _load(_soic_board())
+    b.netclasses['Default'].track_width = 0.3
+    fo = fanout(b, _nets(b), 0.25)
+    p1 = next(p for p in b.pads if p.ref == 'U1' and p.number == '1')
+    segs, vias = fo[p1.net]
+    assert len(segs) == 1 and len(vias) == 1
+    h = next(p for p in b.pads if p.ref == 'J1' and p.net == p1.net)
+    return b, fo, p1.net, segs[0], vias[0], (h.x, h.y)
+
+
+def _routed(net, segments, complete=True):
+    from tracklayer.router import NetRoute
+    return {net: NetRoute(net, segments=list(segments), complete=complete)}
+
+
+def test_prune_keeps_a_via_the_route_leaves_on_another_layer():
+    from tracklayer.fanout import prune
+    b, fo, net, stub, (vx, vy), (hx, hy) = _one_stub()
+    assert prune(_routed(net, [('B.Cu', vx, vy, hx, hy, 0.3)]), fo, b) == (0, 0)
+    assert fo[net] == ([stub], [(vx, vy)])
+
+
+def test_prune_drops_a_via_the_route_passes_on_the_same_layer():
+    """The track carries on from the stub's end on the stub's own layer: the stub stays, the hole goes."""
+    from tracklayer.fanout import prune
+    b, fo, net, stub, (vx, vy), (hx, hy) = _one_stub()
+    n_vias = len(b.vias)
+    assert prune(_routed(net, [('F.Cu', vx, vy, hx, hy, 0.3)]), fo, b) == (1, 0)
+    assert fo[net] == ([stub], [])
+    assert len(b.vias) == n_vias - 1
+
+
+def test_prune_drops_a_stub_and_via_nothing_uses():
+    """The net left its pad some other way: stub and via are a spur with a hole on the end."""
+    from tracklayer.fanout import prune
+    b, fo, net, stub, (vx, vy), (hx, hy) = _one_stub()
+    px, py = stub[1], stub[2]
+    assert prune(_routed(net, [('F.Cu', px, py, hx, hy, 0.3)]), fo, b) == (1, 1)
+    assert fo[net] == ([], [])
+
+
+def test_prune_swaps_a_junction_via_for_a_short_segment():
+    """A track that ends on the via's rim touches the via but not the stub: the via goes only because a
+    short segment takes over the join, so the track is not left hanging."""
+    from tracklayer.fanout import prune, _touch
+    b, fo, net, stub, (vx, vy), (hx, hy) = _one_stub()
+    track = ('F.Cu', vx - 0.35, vy, vx - 0.35, vy - 3, 0.3)       # starts beyond the stub's end, on the rim
+    assert prune(_routed(net, [track, ('F.Cu', vx - 0.35, vy - 3, hx, hy, 0.3)]), fo, b) == (1, 0)
+    segs, vias = fo[net]
+    assert vias == [] and len(segs) == 2 and segs[0] == stub
+    assert _touch(('s', *segs[1]), ('s', *stub), True) and _touch(('s', *segs[1]), ('s', *track), True)
+
+
+def test_prune_keeps_a_junction_via_with_no_room_for_the_segment():
+    """The same, but another net's track runs where the joining segment would go: the via stays."""
+    from tracklayer.board import Track
+    from tracklayer.fanout import prune
+    b, fo, net, stub, (vx, vy), (hx, hy) = _one_stub()
+    other = next(n for n in fo if n != net)
+    b.tracks.append(Track(vx - 0.2, vy - 0.3, vx - 0.2, vy + 0.3, 0.1, 'F.Cu', other))
+    route = [('F.Cu', vx - 0.35, vy, vx - 0.35, vy - 3, 0.3), ('F.Cu', vx - 0.35, vy - 3, hx, hy, 0.3)]
+    assert prune(_routed(net, route), fo, b) == (0, 0)
+    assert fo[net] == ([stub], [(vx, vy)])
+
+
+def test_prune_trims_the_spur_the_router_ran_to_an_unused_via():
+    """The net leaves the pad directly, and a second track runs from the pad to the via's rim: with the
+    via gone that track ends on nothing, so it goes too."""
+    from tracklayer.fanout import prune
+    b, fo, net, stub, (vx, vy), (hx, hy) = _one_stub()
+    px, py = stub[1], stub[2]
+    main = ('F.Cu', px, py, hx, hy, 0.3)
+    spur = ('F.Cu', px, py + 0.2, vx + 0.3, vy + 0.2, 0.3)
+    routes = _routed(net, [main, spur])
+    assert prune(routes, fo, b) == (1, 2)
+    assert fo[net] == ([], []) and routes[net].segments == [main]
+
+
+def test_prune_leaves_an_incomplete_net_alone():
+    from tracklayer.fanout import prune
+    b, fo, net, stub, (vx, vy), (hx, hy) = _one_stub()
+    assert prune(_routed(net, [], complete=False), fo, b) == (0, 0)
+    assert prune({}, fo, b) == (0, 0)
+    assert fo[net] == ([stub], [(vx, vy)])
+
+
+def test_no_unused_fanout_via_survives_routing():
+    """After a full route, every fan-out via left is reached by a track on a layer other than its stub's."""
+    from tracklayer.fanout import prune, merge, _seg_dist
+    from tracklayer.router import NetRoute
+    b = _load(_soic_board())
+    b.netclasses['Default'].track_width = 0.3
+    nets = _nets(b)
+    fo = fanout(b, nets, 0.25)
+    r = ShapeRouter(b, nets, Options(verbose=False, neck_width=0.25))
+    r.run()
+    prune(r.routes, fo, b)
+    stubs = {n: list(s) for n, (s, v) in fo.items()}
+    merge(r.routes, fo, b, NetRoute)
+    for n, (segs, vias) in fo.items():
+        for (vx, vy) in vias:
+            layer = next(s[0] for s in stubs[n] if (s[3], s[4]) == (vx, vy))
+            assert any(s[0] != layer and _seg_dist(vx, vy, *s[1:5]) < 0.4 + s[5] / 2 for s in r.routes[n].segments), n
